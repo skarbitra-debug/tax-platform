@@ -46,3 +46,15 @@ export {
   type StatusChangeMode,
   type ChangeSource,
 } from "./status/engine";
+
+// --- M3: передача заявки в noname-канал (§4.5) ---
+export { formatHandoffMessage, type HandoffDeal } from "./handoff/format";
+
+// --- M3: голосовой ассистент смены статусов (§4.7) ---
+export {
+  applyVoiceCommand,
+  buildVoiceContext,
+  type ParsedVoiceIntent,
+  type VoiceCommandMeta,
+  type ApplyVoiceResult,
+} from "./voice/apply";

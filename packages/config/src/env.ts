@@ -68,6 +68,15 @@ export const webEnvSchema = baseSchema.extend({
       )
       .optional(),
   ),
+  // M3: передача заявки в канал девочек (§4.5) отправляется прямо из web
+  // через Bot API. Оба optional: пока не заданы — хендофф молча пропускается
+  // (заявка всё равно создаётся, Татьяна видит её в ЛК).
+  TELEGRAM_BOT_TOKEN: emptyAsUndefined(
+    z.string().regex(/^\d+:[\w-]{30,}$/, 'TELEGRAM_BOT_TOKEN не похож на токен BotFather').optional(),
+  ),
+  TELEGRAM_CHANNEL_ID: emptyAsUndefined(
+    z.string().regex(/^-100\d+$/, 'TELEGRAM_CHANNEL_ID: ожидается формат -100xxxxxxxxxx').optional(),
+  ),
 });
 
 /**
@@ -98,6 +107,13 @@ export const botEnvSchema = baseSchema.extend({
   ),
   // голосовой ассистент — M3
   ANTHROPIC_API_KEY: emptyAsUndefined(z.string().min(1).optional()),
+  // чат Татьяны: ТОЛЬКО он может голосом двигать статусы (§4.7). Без него
+  // голосовой ассистент отвечает «не авторизовано». Числовой chat_id.
+  TELEGRAM_ADMIN_CHAT_ID: emptyAsUndefined(
+    z.string().regex(/^-?\d+$/, 'TELEGRAM_ADMIN_CHAT_ID: числовой chat_id').optional(),
+  ),
+  // модель Claude для разбора голосовых команд (дёшево и быстро — haiku)
+  VOICE_LLM_MODEL: z.string().default('claude-haiku-4-5-20251001'),
 });
 
 export type BaseEnv = z.infer<typeof baseSchema>;

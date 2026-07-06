@@ -23,6 +23,9 @@ importers:
       '@tax/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@tax/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@tax/db':
         specifier: workspace:*
         version: link:../../packages/db

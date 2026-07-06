@@ -3,6 +3,7 @@
 import { createLead, leadFormSchema } from "@tax/core";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getRequestMeta } from "@/lib/request-meta";
+import { sendHandoffToChannel } from "@/lib/telegram";
 
 /**
  * Состояние анкеты для useActionState. Успех рендерится НА МЕСТЕ формы
@@ -79,6 +80,13 @@ export async function submitApplication(
           : "Ссылка недействительна. Запросите ссылку у вашего риэлтора.",
     };
   }
+
+  // Передача в noname-канал девочек (§4.5) — best-effort, не блокирует ответ
+  // клиенту и не роняет заявку при недоступности Telegram. Идемпотентный повтор
+  // сабмита (тот же submissionId) сюда не заходит с новой сделкой — createLead
+  // вернул бы ту же, но hook уже отработал при первом создании; для простоты
+  // на пилоте допускаем повторную отправку при реальном повторе (редко).
+  await sendHandoffToChannel(result.dealId);
 
   // result.dealNumber клиенту НЕ показываем (номер — внутренний, для ЛК и голосовых команд)
   return { ok: true };

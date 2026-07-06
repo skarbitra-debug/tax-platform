@@ -4,6 +4,8 @@
 import { env } from "./env";
 import { prisma } from "@tax/db";
 import { Bot } from "grammy";
+import { isSttConfigured } from "./stt";
+import { handleVoice } from "./voice";
 
 const bot = new Bot(env.TELEGRAM_BOT_TOKEN);
 
@@ -12,13 +14,17 @@ bot.command("start", async (ctx) => {
   try {
     // Демо чтения общей БД: сущность Deal (не Lead — контракт §1)
     const dealCount = await prisma.deal.count();
-    await ctx.reply(`Бот платформы жив. Сделок в базе: ${dealCount}`);
+    const voice = isSttConfigured() ? "голосовое управление статусами включено" : "голосовой ассистент в настройке";
+    await ctx.reply(`Бот платформы жив. Сделок в базе: ${dealCount}.\n${voice}`);
   } catch (err) {
     // БД лежит — бот всё равно отвечает: long polling живёт независимо от Postgres
     console.error("[bot] prisma.deal.count() недоступен:", err);
     await ctx.reply("Бот платформы жив.");
   }
 });
+
+// Голосовая команда смены статуса (§4.7) — только из чата Татьяны
+bot.on("message:voice", handleVoice);
 
 // Ошибка в обработчике апдейта не должна ронять процесс поллинга
 bot.catch((err) => {
