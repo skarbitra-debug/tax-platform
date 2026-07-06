@@ -1,17 +1,60 @@
 @import "tailwindcss";
 
 /*
- * Тема витрины (M5). Акцентный цвет вынесен в CSS-переменные: когда придут
- * фирменные цвета Татьяны (§11.4), перекраска = смена этих двух значений,
- * вёрстку трогать не нужно (компоненты используют bg-[var(--accent)] и т.п.).
+ * Тема. Референс дизайна витрины (http://78.17.16.24) — тёмный премиум:
+ * near-black фон, Inter, синий CTA + изумрудный градиент на акцентах.
+ * РАБОЧИЕ ПАНЕЛИ (ЛК риэлтора, админка) — СВЕТЛЫЕ (данные/формы читаются
+ * лучше): body по умолчанию светлый, тёмный фон включает только обёртка
+ * витрины (marketing/layout).
  */
 :root {
-  --accent: #2563eb; /* blue-600 — временный нейтральный акцент */
-  --accent-hover: #1d4ed8; /* blue-700 */
-  --accent-soft: #eff6ff; /* blue-50 — подложки бейджей/иконок */
-  --accent-ink: #1e40af; /* blue-800 — текст на светлой подложке */
+  /* синий CTA — как в референсе (#3b82f6) */
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-soft: #eff6ff;
+  --accent-ink: #1e40af;
+  /* изумрудный акцент (градиент на цифрах/выделениях) */
+  --emerald: #10b981;
+  --emerald-light: #34d399;
+
+  /* токены тёмной витрины */
+  --landing-bg: #0a0a0f;
+  --landing-card: rgba(255, 255, 255, 0.04);
+  --landing-border: rgba(255, 255, 255, 0.08);
+  --landing-muted: rgba(255, 255, 255, 0.6);
 }
 
 body {
   @apply bg-slate-50 text-slate-900 antialiased;
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Утилиты витрины (используются только в marketing) */
+.landing {
+  background: var(--landing-bg);
+  color: #fff;
+}
+/* мягкое свечение под hero — синий→изумруд, как в референсе */
+.landing-glow {
+  background:
+    radial-gradient(60% 50% at 50% 0%, rgba(59, 130, 246, 0.18), transparent 70%),
+    radial-gradient(40% 40% at 70% 10%, rgba(16, 185, 129, 0.1), transparent 70%);
+}
+.landing-card {
+  background: var(--landing-card);
+  border: 1px solid var(--landing-border);
+}
+/* градиентный текст (изумруд) для акцентных цифр/слов */
+.text-emerald-gradient {
+  background: linear-gradient(135deg, var(--emerald), var(--emerald-light));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* градиентный заголовок: белый → синий → изумруд */
+.text-hero-gradient {
+  background: linear-gradient(135deg, #fff 0%, var(--accent) 50%, var(--emerald) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }

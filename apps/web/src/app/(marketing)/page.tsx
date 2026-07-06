@@ -1,46 +1,75 @@
 import Link from "next/link";
 
 /**
- * [M5] Витрина для риэлтора (§4.1): оффер + как работает + выгоды + FAQ + CTA.
- * Контент и структура финальные; фирменные цвета/шрифты придут от Татьяны
- * (§11.4) — акцент вынесен в CSS-переменные (globals.css), перекраска локальна.
+ * [M5] Витрина для риэлтора (§4.1). Тёмный премиум-дизайн по референсу
+ * http://78.17.16.24: near-black фон, Inter, синий CTA + изумрудный акцент,
+ * стеклянные карточки, свечение под hero. Тексты — честные под нашу модель
+ * (комиссия настраиваемая, без выдуманных фикс-сумм).
  */
+
+const STATS = [
+  { value: "0 ₽", label: "вложений от вас и клиента до результата" },
+  { value: "30 сек", label: "регистрация по коду агентства" },
+  { value: "~3 мес", label: "средний срок возврата через ФНС" },
+];
+
+const PAINS = [
+  {
+    title: "Клиент переплатил налог",
+    text: "Продавцы недвижимости часто платят НДФЛ больше, чем должны — из-за неверной консультации.",
+  },
+  {
+    title: "Разбираться некогда",
+    text: "Возврат — это документы, декларации и ФНС. У риэлтора нет на это времени, у клиента — знаний.",
+  },
+  {
+    title: "Деньги просто теряются",
+    text: "Без специалиста переплата так и остаётся в бюджете. А могла бы вернуться клиенту.",
+  },
+];
 
 const STEPS = [
   {
     n: "1",
-    title: "Отправляете ссылку",
-    text: "Генерируете персональную ссылку в кабинете и отправляете клиенту, который продал недвижимость.",
+    title: "Зарегистрируйтесь",
+    text: "По инвайт-коду от вашего агентства — за 30 секунд, без ожидания одобрения.",
   },
   {
     n: "2",
-    title: "Клиент оставляет заявку",
-    text: "Заполняет короткую анкету по вашей ссылке. Заявка автоматически закрепляется за вами.",
+    title: "Отправьте ссылку клиенту",
+    text: "Персональная ссылка в один клик. Заявка автоматически закрепляется за вами.",
   },
   {
     n: "3",
-    title: "Мы возвращаем налог",
-    text: "Наши специалисты проверяют переплату, готовят документы и ведут возврат через ФНС.",
-  },
-  {
-    n: "4",
-    title: "Вы получаете вознаграждение",
-    text: "После успешного возврата и оплаты клиентом вы получаете свою долю. Всё видно в кабинете.",
+    title: "Получите вознаграждение",
+    text: "Мы возвращаем налог, клиент платит только с результата — вы получаете свою долю.",
   },
 ];
 
 const BENEFITS = [
   {
+    title: "Не нужно разбираться в налогах",
+    text: "Всю работу с ФНС и документами ведут наши специалисты. От вас — только ссылка клиенту.",
+  },
+  {
+    title: "Клиент делает всё сам",
+    text: "Заполняет короткую анкету по ссылке. Дальше с ним работают напрямую, вас не дёргают.",
+  },
+  {
+    title: "Оплата — только за результат",
+    text: "Клиент платит комиссию с фактически возвращённой суммы и только после поступления денег.",
+  },
+  {
+    title: "Прозрачный кабинет",
+    text: "Каждая заявка — со статусом: от «новой» до «выплаты сделаны». Вы всегда видите, где деньги.",
+  },
+  {
+    title: "Заявки закреплены за вами",
+    text: "Атрибуция по вашей ссылке. Вознаграждение по каждой успешной сделке — ваше.",
+  },
+  {
     title: "Законно",
-    text: "Возвращаем переплаченный НДФЛ по сделкам с недвижимостью в рамках закона — не «схемы».",
-  },
-  {
-    title: "Без вложений для клиента",
-    text: "Клиент платит комиссию только с фактически возвращённого налога — после результата.",
-  },
-  {
-    title: "Прозрачно",
-    text: "Каждая заявка — со статусом: от «новой» до «выплаты сделаны». Вы всегда в курсе.",
+    text: "Возвращаем переплаченный НДФЛ в рамках закона — это ваш налоговый вычет, а не «схема».",
   },
 ];
 
@@ -63,123 +92,165 @@ const FAQ = [
   },
 ];
 
-function Cta({ variant = "primary" }: { variant?: "primary" | "ghost" }) {
-  if (variant === "ghost") {
-    return (
-      <Link
-        href="/login"
-        className="rounded-xl border border-slate-300 bg-white px-6 py-3 text-base font-semibold text-slate-700 hover:bg-slate-50"
-      >
-        У меня уже есть аккаунт
-      </Link>
-    );
-  }
+function PrimaryCta({ children = "Стать партнёром" }: { children?: React.ReactNode }) {
   return (
     <Link
       href="/register"
-      className="rounded-xl px-6 py-3 text-base font-semibold text-white hover:opacity-90"
+      className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-base font-semibold text-white transition hover:opacity-90"
       style={{ backgroundColor: "var(--accent)" }}
     >
-      Стать партнёром
+      {children}
+      <span aria-hidden>→</span>
     </Link>
   );
 }
 
 export default function MarketingPage() {
   return (
-    <div className="mx-auto max-w-5xl px-4">
-      {/* Hero */}
-      <section className="py-16 sm:py-20">
-        <div className="max-w-2xl">
-          <p
-            className="mb-3 inline-block rounded-full px-3 py-1 text-xs font-semibold"
-            style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent-ink)" }}
-          >
+    <div>
+      {/* HERO */}
+      <section className="relative overflow-hidden">
+        <div className="landing-glow pointer-events-none absolute inset-0" aria-hidden />
+        <div className="relative mx-auto max-w-4xl px-4 pb-20 pt-20 text-center sm:pt-28">
+          <span className="landing-card inline-flex items-center rounded-full px-4 py-1.5 text-xs font-medium text-white/70">
             Партнёрская программа для риэлторов
-          </p>
-          <h1 className="text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
-            Ваши клиенты возвращают налоги за прошлые годы — вы получаете вознаграждение
+          </span>
+          <h1 className="mt-6 text-4xl font-bold leading-[1.1] tracking-tight sm:text-6xl">
+            Зарабатывайте <span className="text-emerald-gradient">на возврате налогов</span> ваших
+            клиентов
           </h1>
-          <p className="mt-5 text-lg text-slate-600">
+          <p className="mx-auto mt-6 max-w-2xl text-lg text-white/60">
             Продали клиенту квартиру? Помогите ему вернуть переплаченный налог. Отправьте
-            персональную ссылку — остальное сделаем мы, а вы видите статус каждой заявки в
-            личном кабинете.
+            персональную ссылку — остальное сделаем мы, а вы получаете вознаграждение с каждой
+            сделки.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Cta />
-            <Cta variant="ghost" />
+          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+            <PrimaryCta>Подключиться бесплатно</PrimaryCta>
+            <Link
+              href="#how"
+              className="rounded-full border border-white/15 px-6 py-3 text-base font-medium text-white/80 transition hover:bg-white/5"
+            >
+              Как это работает?
+            </Link>
           </div>
-          <p className="mt-4 text-sm text-slate-500">
-            Регистрация — по инвайт-коду от вашего агентства.
-          </p>
+
+          {/* Статистика */}
+          <div className="mx-auto mt-14 grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-3">
+            {STATS.map((s) => (
+              <div key={s.label} className="landing-card rounded-2xl px-5 py-6">
+                <div className="text-2xl font-bold text-emerald-gradient">{s.value}</div>
+                <div className="mt-1 text-xs text-white/50">{s.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* Как это работает */}
-      <section className="border-t border-slate-200 py-16">
-        <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Как это работает</h2>
-        <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      {/* БОЛЬ */}
+      <section className="mx-auto max-w-6xl px-4 py-20">
+        <h2 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
+          Налоги клиентов — не ваша забота
+        </h2>
+        <p className="mx-auto mt-3 max-w-2xl text-center text-white/50">
+          Вы приводите клиента — переплату находим и возвращаем мы.
+        </p>
+        <div className="mt-10 grid gap-5 sm:grid-cols-3">
+          {PAINS.map((p) => (
+            <div
+              key={p.title}
+              className="rounded-3xl border border-red-500/15 bg-red-500/5 p-6"
+            >
+              <h3 className="font-semibold">{p.title}</h3>
+              <p className="mt-2 text-sm text-white/55">{p.text}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ТРИ ШАГА */}
+      <section id="how" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-20">
+        <h2 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
+          Три шага — и вы зарабатываете
+        </h2>
+        <div className="mt-12 grid gap-6 sm:grid-cols-3">
           {STEPS.map((s) => (
-            <div key={s.n} className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div key={s.n} className="landing-card rounded-3xl p-7">
               <div
-                className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white"
+                className="flex h-11 w-11 items-center justify-center rounded-full text-lg font-bold text-white"
                 style={{ backgroundColor: "var(--accent)" }}
               >
                 {s.n}
               </div>
-              <h3 className="mt-4 font-semibold">{s.title}</h3>
-              <p className="mt-2 text-sm text-slate-600">{s.text}</p>
+              <h3 className="mt-5 text-lg font-semibold">{s.title}</h3>
+              <p className="mt-2 text-sm text-white/55">{s.text}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Выгоды */}
-      <section className="border-t border-slate-200 py-16">
-        <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Почему это работает</h2>
-        <div className="mt-8 grid gap-6 sm:grid-cols-3">
+      {/* ПОЧЕМУ РАБОТАЕТ */}
+      <section className="mx-auto max-w-6xl px-4 py-20">
+        <h2 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
+          Почему это работает
+        </h2>
+        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {BENEFITS.map((b) => (
-            <div key={b.title} className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-              <h3 className="text-lg font-semibold">{b.title}</h3>
-              <p className="mt-2 text-sm text-slate-600">{b.text}</p>
+            <div key={b.title} className="landing-card rounded-3xl p-6">
+              <div
+                className="mb-4 h-1.5 w-10 rounded-full"
+                style={{ background: "linear-gradient(135deg, var(--emerald), var(--emerald-light))" }}
+              />
+              <h3 className="font-semibold">{b.title}</h3>
+              <p className="mt-2 text-sm text-white/55">{b.text}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ЭКСПЕРТ */}
+      <section className="mx-auto max-w-4xl px-4 py-20">
+        <div className="landing-card rounded-3xl p-8 text-center sm:p-12">
+          <span className="text-emerald-gradient text-sm font-semibold uppercase tracking-wide">
+            За консультациями
+          </span>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight">
+            Практикующий налоговый консультант
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-white/60">
+            Возвраты ведёт эксперт по налогообложению сделок с недвижимостью и её команда.
+            Тысячи возвращённых рублей клиентам — законно, через ФНС, с полным сопровождением.
+          </p>
         </div>
       </section>
 
       {/* FAQ */}
-      <section className="border-t border-slate-200 py-16">
-        <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Частые вопросы</h2>
-        <div className="mt-8 divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
+      <section className="mx-auto max-w-3xl px-4 py-20">
+        <h2 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">Частые вопросы</h2>
+        <div className="mt-10 space-y-3">
           {FAQ.map((f) => (
-            <details key={f.q} className="group p-5">
-              <summary className="cursor-pointer list-none font-medium marker:content-none">
-                <span className="flex items-center justify-between gap-4">
-                  {f.q}
-                  <span className="text-slate-400 transition group-open:rotate-45">+</span>
-                </span>
+            <details key={f.q} className="landing-card group rounded-2xl p-5">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-medium marker:content-none">
+                {f.q}
+                <span className="text-white/40 transition group-open:rotate-45">+</span>
               </summary>
-              <p className="mt-3 text-sm text-slate-600">{f.a}</p>
+              <p className="mt-3 text-sm text-white/55">{f.a}</p>
             </details>
           ))}
         </div>
       </section>
 
-      {/* Финальный CTA */}
-      <section className="border-t border-slate-200 py-16">
-        <div
-          className="rounded-3xl px-6 py-12 text-center"
-          style={{ backgroundColor: "var(--accent-soft)" }}
-        >
-          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Начните зарабатывать на возвратах
+      {/* ФИНАЛЬНЫЙ CTA */}
+      <section className="mx-auto max-w-5xl px-4 pb-24">
+        <div className="landing-glow relative overflow-hidden rounded-[2rem] border border-white/10 px-6 py-16 text-center">
+          <h2 className="relative text-3xl font-bold tracking-tight sm:text-4xl">
+            Подключитесь за 30 секунд
           </h2>
-          <p className="mx-auto mt-3 max-w-xl text-slate-600">
-            Присоединяйтесь к партнёрской сети. Один инвайт-код — и вы уже отправляете
-            клиентам ссылки.
+          <p className="relative mx-auto mt-3 max-w-xl text-white/60">
+            Один инвайт-код от агентства — и вы уже отправляете клиентам ссылки. Регистрация
+            бесплатна.
           </p>
-          <div className="mt-8 flex justify-center">
-            <Cta />
+          <div className="relative mt-8 flex justify-center">
+            <PrimaryCta />
           </div>
         </div>
       </section>

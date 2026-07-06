@@ -1,7 +1,15 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import type { ReactNode } from "react";
 import { pilotNoindexFromEnv } from "@tax/config";
 import "./globals.css";
+
+// Inter (с кириллицей) — как в дизайн-референсе витрины; переменная в globals.css
+const inter = Inter({
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 /**
  * Закрытый пилот: при PILOT_NOINDEX глушим индексацию на всех страницах
@@ -25,7 +33,7 @@ export function generateMetadata(): Metadata {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="ru">
+    <html lang="ru" className={inter.variable}>
       <body className="min-h-screen">{children}</body>
     </html>
   );
