@@ -68,9 +68,10 @@ export async function saveCommissionConfigAction(
     return { error: "Укажите процент исполнителя." };
   }
 
-  await prisma.$transaction([
-    prisma.commissionConfig.updateMany({ where: { isActive: true }, data: { isActive: false } }),
-    prisma.commissionConfig.create({
+  try {
+    await prisma.$transaction([
+      prisma.commissionConfig.updateMany({ where: { isActive: true }, data: { isActive: false } }),
+      prisma.commissionConfig.create({
       data: {
         name: "config",
         clientRatePct: new Prisma.Decimal(d.clientRatePct),
@@ -85,8 +86,17 @@ export async function saveCommissionConfigAction(
         isActive: true,
         createdById: session.user.id,
       },
-    }),
-  ]);
+      }),
+    ]);
+  } catch (e) {
+    // Гонка двух одновременных сохранений: partial-unique индекс
+    // CommissionConfig_single_active_key пропускает только одного — второй
+    // получает P2002, а не второй активный конфиг. Честно просим повторить.
+    if (typeof e === "object" && e !== null && "code" in e && e.code === "P2002") {
+      return { error: "Настройки сохранял кто-то ещё одновременно — обновите страницу и повторите." };
+    }
+    throw e;
+  }
 
   revalidatePath("/admin/settings/commissions");
   return { ok: true };
@@ -141,11 +151,19 @@ export async function toggleStatusAction(
 
   const status = await prisma.dealStatus.findUnique({
     where: { id: statusId },
-    select: { isActive: true, isInitial: true },
+    select: { code: true, isActive: true, isInitial: true },
   });
   if (!status) return { error: "Статус не найден." };
   if (status.isInitial && status.isActive) {
     return { error: "Нельзя выключить начальный статус — на него создаются заявки." };
+  }
+  // Коды, на которые завязаны авто-переходы (§6): выключение сломало бы
+  // событие «договор отправлен» — авто-смена молча перестала бы работать
+  const AUTO_TRANSITION_CODES = ["CONTRACT_SENT"];
+  if (status.isActive && AUTO_TRANSITION_CODES.includes(status.code)) {
+    return {
+      error: `Статус ${status.code} используется авто-переходом «договор отправлен» — выключать нельзя (переименовать можно).`,
+    };
   }
 
   await prisma.dealStatus.update({ where: { id: statusId }, data: { isActive: !status.isActive } });

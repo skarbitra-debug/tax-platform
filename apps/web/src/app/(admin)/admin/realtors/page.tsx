@@ -1,6 +1,7 @@
 import { prisma } from "@tax/db";
 import { requireRole } from "@/lib/require-role";
 import { UserStatusBadge, formatDate } from "../_lib/ui";
+import { BlockButton } from "./block-button";
 
 export const metadata = { title: "Риэлторы — админ-панель" };
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export default async function AdminRealtorsPage() {
       id: true,
       agencyName: true,
       user: {
-        select: { name: true, email: true, phone: true, status: true, createdAt: true },
+        select: { id: true, name: true, email: true, phone: true, status: true, createdAt: true },
       },
       // Одна активная ссылка гарантирована partial-unique индексом (§2) —
       // take: 1 достаточно, тянем только факт наличия
@@ -51,7 +52,8 @@ export default async function AdminRealtorsPage() {
                 <th className="px-3 py-3 font-medium">Регистрация</th>
                 <th className="px-3 py-3 font-medium">Заявки</th>
                 <th className="px-3 py-3 font-medium">Ссылка</th>
-                <th className="px-3 py-3 pr-5 font-medium">Статус</th>
+                <th className="px-3 py-3 font-medium">Статус</th>
+                <th className="px-3 py-3 pr-5 font-medium">Действия</th>
               </tr>
             </thead>
             <tbody>
@@ -74,8 +76,11 @@ export default async function AdminRealtorsPage() {
                       <span className="text-slate-400">Нет</span>
                     )}
                   </td>
-                  <td className="px-3 py-3 pr-5">
+                  <td className="px-3 py-3">
                     <UserStatusBadge status={r.user.status} />
+                  </td>
+                  <td className="px-3 py-3 pr-5">
+                    <BlockButton userId={r.user.id} status={r.user.status} />
                   </td>
                 </tr>
               ))}

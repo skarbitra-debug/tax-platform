@@ -1,0 +1,2 @@
+# next build требует каталог public при COPY в Docker (apps/web/Dockerfile);
+# статики пока нет - favicon/og-image добавятся с брендом Татьяны (M5)

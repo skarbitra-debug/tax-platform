@@ -5,6 +5,7 @@ import { z } from "zod";
 import { changeDealStatus, changeDealStatusByCode, recalcDealCommission } from "@tax/core";
 import { Prisma, prisma } from "@tax/db";
 import { requireRole } from "@/lib/require-role";
+import { sendHandoffToChannel } from "@/lib/telegram";
 
 /** Состояние форм карточки сделки (useActionState) */
 export type DealActionState = { ok?: boolean; error?: string };
@@ -107,7 +108,7 @@ export async function markClientPaidAction(
 /**
  * Отметить «договор отправлен клиенту» (§4.8): фиксируем contractSentAt и
  * двигаем статус на CONTRACT_SENT (авто-переход по событию, §6).
- * ВНИМАНИЕ: механизм самого подписания (галка/ЭЦП/сторонний сервис) — §11.3,
+ * ВНИМАНИЕ: механизм самого подписания (галка/ЭЦП/сторонний сервис) — §11.14,
  * пока не определён; здесь трекается только факт отправки.
  */
 export async function markContractSentAction(
@@ -122,17 +123,132 @@ export async function markContractSentAction(
     where: { id: dealId },
     data: { contractSentAt: new Date() },
   });
-  // авто-переход статуса по событию «договор отправлен»
-  await changeDealStatusByCode({
-    dealId,
-    toStatusCode: "CONTRACT_SENT",
-    mode: "AUTO",
-    source: "WEB",
-    actorUserId: session.user.id,
-    comment: "Договор отправлен клиенту",
-  });
+
+  // Авто-переход ТОЛЬКО ВПЕРЁД: повторная отправка договора со сделки в более
+  // позднем статусе (например «В работе») не должна откатывать воронку назад
+  const [deal, target] = await Promise.all([
+    prisma.deal.findUnique({
+      where: { id: dealId },
+      select: { status: { select: { sortOrder: true } } },
+    }),
+    prisma.dealStatus.findUnique({
+      where: { code: "CONTRACT_SENT" },
+      select: { sortOrder: true },
+    }),
+  ]);
+  const isForward = !!deal && !!target && deal.status.sortOrder < target.sortOrder;
+
+  if (isForward) {
+    const moved = await changeDealStatusByCode({
+      dealId,
+      toStatusCode: "CONTRACT_SENT",
+      mode: "AUTO",
+      source: "WEB",
+      actorUserId: session.user.id,
+      comment: "Договор отправлен клиенту",
+    });
+    // Результат НЕ игнорируем: статус мог быть деактивирован в настройках —
+    // дата отправки записана, но воронка не сдвинулась, честно говорим об этом
+    if (!moved.ok) {
+      revalidatePath(`/admin/deals/${dealId}`);
+      return {
+        error:
+          "Дата отправки записана, но статус не изменён: «Договор отправлен» " +
+          "выключен в настройках статусов.",
+      };
+    }
+  }
 
   revalidatePath(`/admin/deals/${dealId}`);
+  return { ok: true };
+}
+
+/**
+ * Повторная отправка заявки в noname-канал (§4.5): для сделок, у которых
+ * хендофф не прошёл (handoffSentAt=null — Telegram лежал или не был настроен).
+ */
+export async function resendHandoffAction(
+  _prev: DealActionState,
+  formData: FormData,
+): Promise<DealActionState> {
+  await requireRole("ADMIN");
+  const dealId = String(formData.get("dealId") ?? "");
+  if (!dealId) return { error: "Сделка не указана." };
+
+  const sent = await sendHandoffToChannel(dealId);
+  revalidatePath(`/admin/deals/${dealId}`);
+  if (!sent) {
+    return {
+      error:
+        "Не удалось отправить в канал: проверьте TELEGRAM_BOT_TOKEN/TELEGRAM_CHANNEL_ID " +
+        "и доступность Telegram.",
+    };
+  }
+  return { ok: true };
+}
+
+/** Отметить «договор подписан» (§4.8) — симметрично отправке, только дата */
+export async function markContractSignedAction(
+  _prev: DealActionState,
+  formData: FormData,
+): Promise<DealActionState> {
+  await requireRole("ADMIN");
+  const dealId = String(formData.get("dealId") ?? "");
+  if (!dealId) return { error: "Сделка не указана." };
+
+  await prisma.deal.update({
+    where: { id: dealId },
+    data: { contractSignedAt: new Date() },
+  });
+  revalidatePath(`/admin/deals/${dealId}`);
+  return { ok: true };
+}
+
+/**
+ * Перепривязка заявки на другого риэлтора (контракт плана §1: last click +
+ * «у админа есть ручная перепривязка» — споры атрибуции решает Татьяна).
+ * Пишем AuditLog с from→to: смена влияет на будущие 15% риэлтора.
+ */
+export async function reassignRealtorAction(
+  _prev: DealActionState,
+  formData: FormData,
+): Promise<DealActionState> {
+  const session = await requireRole("ADMIN");
+  const parsed = z
+    .object({ dealId: z.string().min(1), realtorId: z.string().min(1) })
+    .safeParse({ dealId: formData.get("dealId"), realtorId: formData.get("realtorId") });
+  if (!parsed.success) return { error: "Выберите риэлтора." };
+
+  const target = await prisma.realtorProfile.findUnique({
+    where: { id: parsed.data.realtorId },
+    select: { id: true },
+  });
+  if (!target) return { error: "Риэлтор не найден." };
+
+  const deal = await prisma.deal.findUnique({
+    where: { id: parsed.data.dealId },
+    select: { realtorId: true },
+  });
+  if (!deal) return { error: "Сделка не найдена." };
+  if (deal.realtorId === parsed.data.realtorId) return { ok: true }; // уже он
+
+  await prisma.$transaction([
+    prisma.deal.update({
+      where: { id: parsed.data.dealId },
+      data: { realtorId: parsed.data.realtorId },
+    }),
+    prisma.auditLog.create({
+      data: {
+        actorUserId: session.user.id,
+        action: "deal.realtor.reassign",
+        entityType: "Deal",
+        entityId: parsed.data.dealId,
+        payload: { from: deal.realtorId, to: parsed.data.realtorId },
+      },
+    }),
+  ]);
+
+  revalidatePath(`/admin/deals/${parsed.data.dealId}`);
   return { ok: true };
 }
 

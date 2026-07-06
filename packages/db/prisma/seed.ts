@@ -39,8 +39,18 @@ function hashPassword(plain: string): Promise<string> {
 
 /// ---------- 1. Админ (Татьяна) ----------
 async function seedAdmin(): Promise<void> {
+  // Валидация формата инлайн (контракт seedEnvSchema из @tax/config): в
+  // migrate-образе workspace-пакетов нет (см. packages/db/Dockerfile), поэтому
+  // правила продублированы — email с «@», пароль ≥8. Иначе опечатка оператора
+  // молча создала бы админа с кривым email/слабым паролем вместо fail-fast.
   const email = requireEnv("ADMIN_EMAIL").trim().toLowerCase(); // lowercase — тот же канон, что в core
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error(`seed: ADMIN_EMAIL не похож на email: "${email}"`);
+  }
   const password = requireEnv("ADMIN_INITIAL_PASSWORD");
+  if (password.length < 8) {
+    throw new Error("seed: ADMIN_INITIAL_PASSWORD короче 8 символов (контракт seedEnvSchema)");
+  }
 
   await prisma.user.upsert({
     where: { email },

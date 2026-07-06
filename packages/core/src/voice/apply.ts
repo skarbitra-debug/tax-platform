@@ -120,9 +120,14 @@ export async function applyVoiceCommand(
  * Каталог для LLM-разбора: свежие незакрытые сделки + активные статусы.
  * Бот кладёт это в промпт Claude, чтобы тот сопоставил речь с номером сделки
  * и кодом статуса (модель не выдумывает несуществующие).
+ *
+ * ПД в промпт НЕ уходят (инвариант §7 ТЗ / RUNBOOK: «только номера сделок и
+ * статусы, никаких ФИО»). Это же закрывает prompt-инъекцию через firstName
+ * из публичной анкеты. Татьяна командует номером сделки («по сделке 12») —
+ * номер показан в её ЛК и в карточках.
  */
 export async function buildVoiceContext(limit = 50): Promise<{
-  deals: { number: number; clientFirstName: string; statusCode: string }[];
+  deals: { number: number; statusCode: string }[];
   statuses: { code: string; label: string }[];
 }> {
   const [deals, statuses] = await Promise.all([
@@ -130,7 +135,7 @@ export async function buildVoiceContext(limit = 50): Promise<{
       where: { status: { isTerminal: false } },
       orderBy: { createdAt: "desc" },
       take: limit,
-      select: { number: true, client: { select: { firstName: true } }, status: { select: { code: true } } },
+      select: { number: true, status: { select: { code: true } } },
     }),
     prisma.dealStatus.findMany({
       where: { isActive: true },
@@ -139,11 +144,7 @@ export async function buildVoiceContext(limit = 50): Promise<{
     }),
   ]);
   return {
-    deals: deals.map((d) => ({
-      number: d.number,
-      clientFirstName: d.client.firstName,
-      statusCode: d.status.code,
-    })),
+    deals: deals.map((d) => ({ number: d.number, statusCode: d.status.code })),
     statuses,
   };
 }

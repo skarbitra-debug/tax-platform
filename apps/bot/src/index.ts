@@ -26,6 +26,36 @@ bot.command("start", async (ctx) => {
 // Голосовая команда смены статуса (§4.7) — только из чата Татьяны
 bot.on("message:voice", handleVoice);
 
+/**
+ * Привязка чата Татьяны к её User: без записи TelegramAccount(kind=ADMIN)
+ * голосовые смены статусов оставались бы в истории без автора
+ * (changedById=null). Идемпотентный upsert при старте; админ на пилоте
+ * один — берём User с role=ADMIN из seed. Сбой не критичен для поллинга.
+ */
+async function ensureAdminTelegramAccount(): Promise<void> {
+  if (!env.TELEGRAM_ADMIN_CHAT_ID) return;
+  try {
+    const admin = await prisma.user.findFirst({
+      where: { role: "ADMIN", status: "ACTIVE" },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+    });
+    await prisma.telegramAccount.upsert({
+      where: { chatId: BigInt(env.TELEGRAM_ADMIN_CHAT_ID) },
+      update: { kind: "ADMIN", userId: admin?.id ?? null, isActive: true },
+      create: {
+        chatId: BigInt(env.TELEGRAM_ADMIN_CHAT_ID),
+        kind: "ADMIN",
+        title: "Чат администратора",
+        userId: admin?.id ?? null,
+      },
+    });
+  } catch (err) {
+    console.error("[bot] не удалось привязать админ-чат к User:", err);
+  }
+}
+void ensureAdminTelegramAccount();
+
 // Ошибка в обработчике апдейта не должна ронять процесс поллинга
 bot.catch((err) => {
   console.error(

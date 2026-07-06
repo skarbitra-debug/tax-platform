@@ -2,20 +2,15 @@ import { prisma } from "@tax/db";
 import { isUniqueViolation } from "../internal/prisma-errors";
 import type { LeadFormInput } from "./lead-form";
 
-/** Результат createLead: успех (в т.ч. идемпотентный повтор) или причина отказа */
-export type CreateLeadResult =
-  | { ok: true; dealId: string; dealNumber: number }
-  | { ok: false; error: "LINK_INACTIVE" | "LINK_NOT_FOUND" };
-
 /**
- * Hook после коммита createLead. В M1 — сознательный no-op: в M3 сюда встаёт
- * передача заявки в Telegram-канал исполнительниц (§4.5 ТЗ). Вызывается ТОЛЬКО
- * для реально созданной сделки — идемпотентный повтор двойного тапа не дублирует
- * побочные эффекты.
+ * Результат createLead: успех (в т.ч. идемпотентный повтор) или причина отказа.
+ * created=false — сделка уже существовала (ретрай с тем же submissionId):
+ * вызывающий код НЕ должен повторять side-эффекты (хендофф в канал §4.5),
+ * иначе девочки получают дубль карточки клиента.
  */
-async function onDealCreated(_dealId: string): Promise<void> {
-  // no-op до M3
-}
+export type CreateLeadResult =
+  | { ok: true; dealId: string; dealNumber: number; created: boolean }
+  | { ok: false; error: "LINK_INACTIVE" | "LINK_NOT_FOUND" };
 
 /**
  * Транзакция создания заявки (план §4, одна $transaction):
@@ -137,7 +132,7 @@ export async function createLead(
         },
       });
 
-      return { ok: true as const, dealId: deal.id, dealNumber: deal.number };
+      return { ok: true as const, dealId: deal.id, dealNumber: deal.number, created: true };
     });
   } catch (e) {
     // P2002 по submissionId — двойной тап: первая транзакция уже закоммичена.
@@ -148,13 +143,11 @@ export async function createLead(
         select: { id: true, number: true },
       });
       if (existing) {
-        return { ok: true, dealId: existing.id, dealNumber: existing.number };
+        return { ok: true, dealId: existing.id, dealNumber: existing.number, created: false };
       }
     }
     throw e;
   }
 
-  // Hook строго ПОСЛЕ коммита — упавший side-effect не откатит заявку
-  if (result.ok) await onDealCreated(result.dealId);
   return result;
 }

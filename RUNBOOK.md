@@ -44,6 +44,10 @@ cp .env.example .env && chmod 600 .env
 #     КОПИЮ ключа — в оффлайн-хранилище: потеря = потеря всех логинов ФНС
 #   ADMIN_EMAIL / ADMIN_INITIAL_PASSWORD (сид Татьяны; пароль сменить после первого входа)
 #   TELEGRAM_BOT_TOKEN — от @BotFather
+#   TELEGRAM_CHANNEL_ID — канал исполнительниц (-100…). БЕЗ него передача
+#     заявок девочкам (§4.5) МОЛЧА выключена — заявки видны только в ЛК!
+#   TELEGRAM_ADMIN_CHAT_ID — chat_id Татьяны (голосовое управление §4.7)
+#   ANTHROPIC_API_KEY — разбор голосовых команд (§4.7)
 
 # DNS: A-запись домена → IP VPS (до первого деплоя, иначе ACME не выдаст сертификат)
 
@@ -55,7 +59,7 @@ chmod +x deploy.sh infra/backup/pg-backup.sh
 sudo touch /var/log/pg-backup.log && sudo chown deploy:deploy /var/log/pg-backup.log
 ```
 
-Проверка: `https://<домен>` открывается с валидным сертификатом, логин админа работает, `docker compose -f docker-compose.prod.yml ps` — все сервисы `running/healthy`, `migrate` — `exited (0)`.
+Проверка: `https://<домен>` открывается с валидным сертификатом, логин админа работает, `docker compose -f docker-compose.prod.yml ps` — все сервисы `running/healthy`, `migrate` — `exited (0)`. **Плюс сквозная проверка §4.5:** отправить тестовую заявку по реф-ссылке и убедиться, что она появилась в Telegram-канале исполнительниц (в карточке сделки — бейдж «Передана в канал»; если «НЕ передана» — проверить TELEGRAM_CHANNEL_ID и логи web).
 
 ## 2. Деплой
 

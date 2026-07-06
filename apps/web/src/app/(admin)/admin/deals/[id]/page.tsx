@@ -9,7 +9,9 @@ import { FlagBadge, StatusBadge, formatDateTime } from "../../_lib/ui";
 import {
   ClientPaidForm,
   ContractForm,
+  HandoffBlock,
   PayoutForm,
+  ReassignForm,
   RefundForm,
   StatusChangeForm,
 } from "./deal-forms";
@@ -119,8 +121,22 @@ export default async function AdminDealPage({ params }: { params: Promise<{ id: 
           <Row label="Сумма сделки" value={formatRub(deal.saleAmount)} />
           <Row label="Уплаченный налог" value={formatRub(deal.taxPaidAmount)} />
           <Row label="Согласие (ставка на момент)" value={`${deal.consentRatePct.toString()}%`} />
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            <ReassignForm
+              dealId={deal.id}
+              currentRealtorId={deal.realtorId}
+              realtors={realtors.map((r) => ({ id: r.id, name: r.user.name ?? r.user.email }))}
+            />
+          </div>
         </Card>
       </div>
+
+      <Card title="Передача исполнителям (§4.5)">
+        <HandoffBlock
+          dealId={deal.id}
+          handoffSentAt={deal.handoffSentAt ? formatDateTime(deal.handoffSentAt) : null}
+        />
+      </Card>
 
       <Card title="Фактический возврат и комиссии">
         <div className="mb-4">
@@ -156,6 +172,7 @@ export default async function AdminDealPage({ params }: { params: Promise<{ id: 
           <ContractForm
             dealId={deal.id}
             sentAt={deal.contractSentAt ? formatDateTime(deal.contractSentAt) : null}
+            signedAt={deal.contractSignedAt ? formatDateTime(deal.contractSignedAt) : null}
           />
         </Card>
 

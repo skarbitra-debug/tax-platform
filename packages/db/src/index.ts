@@ -5,7 +5,10 @@
  * кастомный output — иначе standalone-Docker и `pnpm deploy` его не находят).
  * Перед typecheck/build обязателен `pnpm db:generate` (корневые скрипты это делают).
  */
-import { PrismaClient } from "../generated/client";
+// ВАЖНО: импорт с явным /index.js, НЕ каталогом: tsup-бандл бота оставляет
+// этот путь литеральным external-импортом, а Node ESM не резолвит каталоги
+// (ERR_UNSUPPORTED_DIR_IMPORT — бот-контейнер крашился на старте).
+import { PrismaClient } from "../generated/client/index.js";
 
 // Singleton через globalThis: в dev Next.js пересоздаёт модули при hot-reload,
 // без кэша каждый reload открывал бы новый пул подключений к Postgres.
@@ -18,4 +21,4 @@ export const prisma: PrismaClient =
 
 // Реэкспорт всего сгенерированного: типы моделей, enum'ы (UserRole, ...),
 // namespace Prisma (Decimal, ошибки P2002 и т.д.), класс PrismaClient.
-export * from "../generated/client";
+export * from "../generated/client/index.js";

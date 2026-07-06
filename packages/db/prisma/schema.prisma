@@ -183,6 +183,10 @@ model Deal {
   // --- факты по ходу сделки ---
   actualRefundAmount   Decimal?  @db.Decimal(14, 2)
   contractSentAt       DateTime?
+  contractSignedAt     DateTime? // ручная отметка подписания (§4.8; механизм — §11.14)
+  handoffSentAt        DateTime? // заявка передана в noname-канал девочек (§4.5);
+  // null = НЕ передана (Telegram недоступен/не настроен) — бейдж и повторная
+  // отправка в карточке сделки, иначе пропуск хендоффа невидим
   clientPaidAmount     Decimal?  @db.Decimal(14, 2) // ручная отметка — эквайринга нет
   clientPaidAt         DateTime?
   clientPaidMarkedById String?

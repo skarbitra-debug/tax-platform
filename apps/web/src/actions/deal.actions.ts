@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { createLead, leadFormSchema } from "@tax/core";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getRequestMeta } from "@/lib/request-meta";
@@ -81,12 +82,13 @@ export async function submitApplication(
     };
   }
 
-  // Передача в noname-канал девочек (§4.5) — best-effort, не блокирует ответ
-  // клиенту и не роняет заявку при недоступности Telegram. Идемпотентный повтор
-  // сабмита (тот же submissionId) сюда не заходит с новой сделкой — createLead
-  // вернул бы ту же, но hook уже отработал при первом создании; для простоты
-  // на пилоте допускаем повторную отправку при реальном повторе (редко).
-  await sendHandoffToChannel(result.dealId);
+  // Передача в noname-канал девочек (§4.5): ТОЛЬКО для реально созданной
+  // сделки (created=false — ретрай с тем же submissionId, дубль в канал не шлём)
+  // и строго ПОСЛЕ ответа клиенту (after() — сабмит не ждёт Telegram;
+  // внутри свой таймаут 5с и запись исхода в Deal.handoffSentAt).
+  if (result.created) {
+    after(() => sendHandoffToChannel(result.dealId));
+  }
 
   // result.dealNumber клиенту НЕ показываем (номер — внутренний, для ЛК и голосовых команд)
   return { ok: true };

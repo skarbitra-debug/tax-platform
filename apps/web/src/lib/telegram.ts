@@ -5,19 +5,27 @@ import { env } from "./env";
 /**
  * Передача заявки в noname-канал исполнительниц (§4.5) прямо из web через
  * Bot API. Best-effort: если токен/канал не заданы или Telegram недоступен —
- * логируем и молчим, НЕ роняя создание заявки (клиент уже отправил анкету,
- * Татьяна увидит заявку в ЛК в любом случае).
+ * логируем и НЕ роняем заявку, но фиксируем исход: успех пишет
+ * Deal.handoffSentAt, иначе поле остаётся null → в карточке сделки бейдж
+ * «не передана в канал» + кнопка повторной отправки (без этого пропуск
+ * хендоффа был невидим нигде, кроме docker logs).
+ *
+ * Вызывается через after() (после ответа клиенту) — сабмит анкеты не ждёт
+ * Telegram; fetch дополнительно ограничен таймаутом 5с (недоступность
+ * api.telegram.org с РФ-хостинга — реалистичный сценарий, а дефолты undici
+ * держали бы соединение минуты).
  *
  * Почему из web, а не из бота: бот на long polling и не слушает события БД;
- * прямой вызов Bot API избавляет от outbox-инфраструктуры на пилоте. Токен —
- * тот же, что у бота (один секрет на два процесса, приемлемо для пилота).
+ * прямой вызов Bot API избавляет от outbox-инфраструктуры на пилоте.
+ *
+ * @returns true, если сообщение доставлено в канал
  */
-export async function sendHandoffToChannel(dealId: string): Promise<void> {
+export async function sendHandoffToChannel(dealId: string): Promise<boolean> {
   const token = env().TELEGRAM_BOT_TOKEN;
   const channelId = env().TELEGRAM_CHANNEL_ID;
   if (!token || !channelId) {
-    console.info("[handoff] TELEGRAM_BOT_TOKEN/CHANNEL_ID не заданы — передача в канал пропущена");
-    return;
+    console.warn("[handoff] TELEGRAM_BOT_TOKEN/CHANNEL_ID не заданы — передача в канал пропущена");
+    return false;
   }
 
   try {
@@ -30,7 +38,7 @@ export async function sendHandoffToChannel(dealId: string): Promise<void> {
         client: { select: { firstName: true, phone: true, telegramUsername: true } },
       },
     });
-    if (!deal) return;
+    if (!deal) return false;
 
     const text = formatHandoffMessage({
       number: deal.number,
@@ -45,11 +53,17 @@ export async function sendHandoffToChannel(dealId: string): Promise<void> {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ chat_id: channelId, text, parse_mode: "HTML" }),
+      signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) {
       console.error(`[handoff] Telegram sendMessage ${res.status}: ${await res.text()}`);
+      return false;
     }
+
+    await prisma.deal.update({ where: { id: dealId }, data: { handoffSentAt: new Date() } });
+    return true;
   } catch (e) {
     console.error("[handoff] отправка в канал не удалась:", e);
+    return false;
   }
 }

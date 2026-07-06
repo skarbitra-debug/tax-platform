@@ -3,7 +3,7 @@ import { prisma } from "@tax/db";
 import type { Context } from "grammy";
 import { env } from "./env";
 import { parseVoiceIntent } from "./intent";
-import { createStt } from "./stt";
+import { createStt, isSttConfigured } from "./stt";
 
 /**
  * Обработчик голосовой команды смены статуса (§4.7).
@@ -36,16 +36,29 @@ export async function handleVoice(ctx: Context): Promise<void> {
     return;
   }
 
+  // Guard ДО скачивания файла: пока STT-движок не выбран/не реализован,
+  // честно отвечаем «в настройке» вместо ложного «попробуйте ещё раз»
+  // (заглушка createStt всегда бросает — ретраи бесполезны)
+  if (!isSttConfigured()) {
+    await ctx.reply(
+      "Голосовой ассистент в настройке: распознавание речи ещё не подключено. " +
+        "Статусы пока меняются в кабинете.",
+    );
+    return;
+  }
+
   const voice = ctx.message?.voice;
   if (!voice) return;
 
   try {
     await ctx.replyWithChatAction("typing");
 
-    // 1. Скачать OGG голосового
+    // 1. Скачать OGG голосового (таймаут: зависший fetch стопорил бы весь поллинг)
     const file = await ctx.getFile();
     const url = `https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
-    const oggBytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
+    const oggBytes = new Uint8Array(
+      await (await fetch(url, { signal: AbortSignal.timeout(15_000) })).arrayBuffer(),
+    );
 
     // 2. Речь → текст (STT-адаптер; движок выбирается позже)
     const transcript = await stt.transcribe(oggBytes);
