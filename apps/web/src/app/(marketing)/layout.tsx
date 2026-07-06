@@ -1,14 +1,15 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { BRAND } from "@/lib/brand";
 
-/** Публичная обвязка: шапка с входом/CTA + подвал. Дизайн — M5 */
+/** [M5] Публичная обвязка витрины: шапка с входом/CTA + подвал. */
 export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b border-slate-200 bg-white">
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <Link href="/" className="text-lg font-bold tracking-tight">
-            Возврат налогов
+            {BRAND.name}
           </Link>
           <nav className="flex items-center gap-3">
             <Link
@@ -19,17 +20,21 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
             </Link>
             <Link
               href="/register"
-              className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+              className="rounded-lg px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
+              style={{ backgroundColor: "var(--accent)" }}
             >
               Стать партнёром
             </Link>
           </nav>
         </div>
       </header>
+
       <main className="flex-1">{children}</main>
+
       <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto max-w-5xl px-4 py-4 text-xs text-slate-500">
-          Закрытый пилот. Доступ — по приглашениям.
+        <div className="mx-auto flex max-w-5xl flex-col gap-2 px-4 py-6 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <span>© {BRAND.name}. Закрытый пилот — доступ по приглашениям.</span>
+          <span>Возврат налогов ведётся в рамках законодательства РФ.</span>
         </div>
       </footer>
     </div>
