@@ -53,3 +53,53 @@ jobs:
       # vitest сам определяет CI и выполняет одиночный прогон (не watch)
       - name: Unit tests (config, crypto, core — без БД)
         run: pnpm -r --if-present --filter @tax/config --filter @tax/crypto --filter @tax/core test
+
+  # ---- Тесты с БД: интеграционные (@tax/core против Postgres) + e2e воронки ----
+  db-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: tax
+          POSTGRES_PASSWORD: tax
+          POSTGRES_DB: tax
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tax -d tax"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+    env:
+      DATABASE_URL: postgresql://tax:tax@localhost:5432/tax
+      # значения для seed и запуска web в e2e
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_INITIAL_PASSWORD: ci-admin-pass
+      AUTH_SECRET: ci-secret-at-least-32-characters-long!!
+      APP_URL: http://localhost:3000
+      PILOT_NOINDEX: "1"
+      SEED_DEV: "1"
+      E2E_WEBSERVER: "1"
+      E2E_BASE_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
+      - name: Migrate + seed (SEED_DEV)
+        run: pnpm db:deploy && pnpm db:seed
+      - name: Integration tests (@tax/core против БД)
+        run: pnpm --filter @tax/integration-tests test
+      - name: Install Playwright chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: E2E воронки (Playwright поднимает web сам)
+        run: pnpm e2e
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

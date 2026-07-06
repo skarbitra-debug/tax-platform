@@ -25,8 +25,7 @@ pnpm install
 pnpm db:migrate
 SEED_DEV=1 pnpm db:seed        # PowerShell: $env:SEED_DEV="1"; pnpm db:seed
 
-# 3. Web-сервер (webServer в playwright.config.ts сознательно НЕ настроен —
-#    сервер поднимается руками или CI-стадией до тестов)
+# 3. Web-сервер (руками)
 pnpm dev:web
 
 # 4. В соседнем терминале — тесты
@@ -34,9 +33,20 @@ E2E_BASE_URL=http://localhost:3000 npx playwright test
 # PowerShell: $env:E2E_BASE_URL="http://localhost:3000"; npx playwright test
 ```
 
+**Альтернатива — Playwright сам поднимет сервер** (как в CI): задать
+`E2E_WEBSERVER=1` — тогда шаг 3 не нужен, сервер стартует на порту из
+`E2E_BASE_URL` (Next читает `PORT`). Порт должен быть свободен, env web
+(`AUTH_SECRET`, `APP_URL`, `DATABASE_URL`…) — в окружении команды.
+
 `E2E_BASE_URL` можно не задавать — дефолт `http://localhost:3000`.
 Для прогона на стейдже: `E2E_BASE_URL=https://<стейдж-домен> npx playwright test`
 (миграции и `SEED_DEV=1`-seed должны быть применены там же).
+
+## В CI
+
+Джоб `db-tests` (`.github/workflows/ci.yml`) поднимает postgres-сервис,
+применяет миграции + `SEED_DEV=1`-seed, гоняет интеграционные тесты
+(`@tax/integration-tests`) и e2e (`E2E_WEBSERVER=1`, Playwright сам стартует web).
 
 Отчёт по падению: `npx playwright show-report` (трейсы и скриншоты
 собираются только для упавших тестов).
