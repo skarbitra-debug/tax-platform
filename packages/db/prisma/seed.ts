@@ -96,7 +96,10 @@ async function seedCommissionConfig(): Promise<void> {
       platformRatePct: "5.00",
       executorPayoutType: "FIXED",
       executorFixedAmount: "20000.00",
-      commissionBase: "REFUND_AMOUNT",
+      // База = гонорар Татьяны (не весь возврат): доли риэлтора/площадки берутся
+      // из её 20%, иначе 15%+5% от возврата съедают весь гонорар и Татьяне минус.
+      // Экономически осмысленный дефолт под пример ТЗ §2; Татьяна меняет в настройках.
+      commissionBase: "CONSULTANT_FEE",
       showPlatformShareToRealtor: false,
       minTaxThreshold: "250000.00", // единственный дом порога 250к (§1)
       isActive: true,

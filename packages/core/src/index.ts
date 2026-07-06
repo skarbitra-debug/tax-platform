@@ -1,6 +1,6 @@
-// @tax/core — бизнес-логика без UI: рефералка, анкета, воронка, комиссии.
+// @tax/core — бизнес-логика без UI: рефералка, анкета, воронка, комиссии, статусы.
 // Единый API-контракт (план §1): остальные зоны импортируют РОВНО эти имена.
-// M2 добавит сюда движок статусов и расчёт распределения комиссий.
+// M3 добавит сюда разбор голосовых команд.
 
 export {
   REFERRAL_TOKEN_ALPHABET,
@@ -24,3 +24,25 @@ export {
 export { createLead, type CreateLeadResult } from "./referral/create-lead";
 
 export { getActiveCommissionConfig, type ActiveCommissionConfig } from "./commission/config";
+
+// --- M2: расчёт распределения комиссий (§2) ---
+export {
+  computeCommission,
+  bankersRoundDiv,
+  type CommissionInput,
+  type CommissionBreakdown,
+  type CommissionBase,
+  type ExecutorInput,
+} from "./commission/compute";
+export { recalcDealCommission, type RecalcResult } from "./commission/persist";
+
+// --- M2: движок статусов сделки (§6, гибрид авто/ручной) ---
+export {
+  listActiveStatuses,
+  changeDealStatus,
+  changeDealStatusByCode,
+  type ChangeStatusArgs,
+  type ChangeStatusResult,
+  type StatusChangeMode,
+  type ChangeSource,
+} from "./status/engine";
