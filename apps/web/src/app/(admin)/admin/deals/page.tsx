@@ -132,8 +132,12 @@ export default async function AdminDealsPage({
             </thead>
             <tbody>
               {deals.map((d) => (
-                <tr key={d.id} className="border-t border-slate-100 align-top">
-                  <td className="px-5 py-3 font-medium">{d.number}</td>
+                <tr key={d.id} className="border-t border-slate-100 align-top hover:bg-slate-50">
+                  <td className="px-5 py-3 font-medium">
+                    <Link href={`/admin/deals/${d.id}`} className="text-blue-600 hover:underline">
+                      {d.number}
+                    </Link>
+                  </td>
                   <td className="whitespace-nowrap px-3 py-3 text-slate-600">
                     {formatDateTime(d.createdAt)}
                   </td>
