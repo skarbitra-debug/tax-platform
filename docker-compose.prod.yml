@@ -1,0 +1,116 @@
+# ============================================================
+# PROD: postgres → migrate (one-shot: deploy && seed) → web+bot → caddy.
+# Env раздельно по сервисам (НЕ blanket env_file): postgres не видит
+# FNS-ключ и токены, bot не видит AUTH_SECRET. Значения — из .env
+# рядом с этим файлом (compose интерполирует ${VAR} сам).
+# DATABASE_URL в прод-.env указывает на хост postgres:
+#   postgresql://tax:...@postgres:5432/tax
+# Сети: internal (internal: true) — Postgres недоступен снаружи ВООБЩЕ,
+# порт не публикуется (§7 ТЗ); edge — выход в интернет (caddy, long
+# polling бота) и вход 80/443 только через caddy.
+# ============================================================
+
+name: tax-platform
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment: # ТОЛЬКО POSTGRES_* — ничего лишнего
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER обязателен}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD обязателен}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB обязателен}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  # one-shot: применяет миграции и сид, завершается с кодом 0 —
+  # только после этого стартуют web и bot
+  migrate:
+    build:
+      context: .
+      dockerfile: packages/db/Dockerfile
+    restart: "no"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL обязателен}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL обязателен (сид админа)}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?ADMIN_INITIAL_PASSWORD обязателен (сид админа)}
+      SEED_DEV: ${SEED_DEV:-0}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      APP_URL: ${APP_URL:?APP_URL обязателен (база реф-ссылок)}
+      DATABASE_URL: ${DATABASE_URL}
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET обязателен}
+      AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-true} # за reverse-proxy (caddy)
+      PILOT_NOINDEX: ${PILOT_NOINDEX:-1}
+      FNS_ENCRYPTION_KEY: ${FNS_ENCRYPTION_KEY:-} # обязателен с M4, схема @tax/config решает
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks: [internal, edge] # edge: caddy должен достучаться до web:3000
+    healthcheck:
+      # /api/health = liveness + SELECT 1 (план §3)
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  bot:
+    build:
+      context: .
+      dockerfile: apps/bot/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN обязателен}
+      TELEGRAM_CHANNEL_ID: ${TELEGRAM_CHANNEL_ID:-} # optional до M2
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}     # M3, голосовой ассистент
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks: [internal, edge] # edge: long polling требует выхода к api.telegram.org
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN обязателен (TLS-сертификат Caddy)}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data     # сертификаты ACME — переживают пересоздание
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+    networks: [edge]
+
+networks:
+  internal:
+    internal: true # без выхода наружу: postgres изолирован полностью
+  edge: {}
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

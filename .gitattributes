@@ -1,0 +1,9 @@
+# Скрипты исполняются на Linux (VPS/Docker) — всегда LF,
+# независимо от core.autocrlf на Windows-машинах разработчиков
+*.sh text eol=lf
+Caddyfile text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.prisma text eol=lf
+*.sql text eol=lf

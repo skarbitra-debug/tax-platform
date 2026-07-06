@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* Базовая типографика пилота; полноценный дизайн — M5 (ждёт референсы §11.4) */
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}

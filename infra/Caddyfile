@@ -1,0 +1,6 @@
+# {$DOMAIN} подставляется Caddy из environment сервиса caddy
+# (docker-compose.prod.yml). TLS-сертификат — автоматически (ACME).
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy web:3000
+}

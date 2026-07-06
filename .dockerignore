@@ -1,0 +1,17 @@
+# КРИТИЧНО: секреты не должны попадать в build-контекст / слои образов
+.env
+.env.*
+!.env.example
+
+.git/
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+dist/
+**/dist/
+coverage/
+*.md
+!packages/**/*.md
+.github/
+infra/backup/

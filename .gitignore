@@ -1,0 +1,19 @@
+# deps / builds
+node_modules/
+.next/
+dist/
+out/
+coverage/
+*.tsbuildinfo
+
+# prisma generated client
+packages/db/generated/
+
+# env — только .env.example в git
+.env
+.env.*
+!.env.example
+
+# misc
+.DS_Store
+*.log

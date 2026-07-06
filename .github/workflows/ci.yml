@@ -1,0 +1,55 @@
+# ============================================================
+# CI (план M0-12): install frozen → prisma validate → generate →
+# lint → typecheck → unit-тесты чистых пакетов (config/crypto/core).
+# БД в CI НЕ поднимается — тесты только чистых функций.
+# ============================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # заглушка: prisma validate резолвит env("DATABASE_URL"), сама БД не нужна
+  DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # версия pnpm берётся из package.json#packageManager (11.11.0)
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma validate
+        run: pnpm --filter @tax/db exec prisma validate
+
+      - name: Prisma generate
+        run: pnpm db:generate
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # vitest сам определяет CI и выполняет одиночный прогон (не watch)
+      - name: Unit tests (config, crypto, core — без БД)
+        run: pnpm -r --if-present --filter @tax/config --filter @tax/crypto --filter @tax/core test

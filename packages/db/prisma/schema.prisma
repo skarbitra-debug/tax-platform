@@ -1,0 +1,402 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// ---------- AUTH (Credentials + JWT: таблиц сессий нет) ----------
+
+// Enum'ы записаны построчно (PSL не принимает однострочную форму из плана §2 — значения те же)
+enum UserRole {
+  ADMIN
+  REALTOR
+}
+
+enum UserStatus {
+  ACTIVE
+  PENDING
+  BLOCKED
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique // lowercase — нормализует core
+  passwordHash String     // argon2id
+  name         String?
+  phone        String?
+  role         UserRole   @default(REALTOR)
+  status       UserStatus @default(ACTIVE) // BLOCKED проверяется по БД в requireRole()
+  inviteCodeId String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  realtorProfile           RealtorProfile?
+  inviteCode               InviteCode?         @relation(fields: [inviteCodeId], references: [id], onDelete: SetNull)
+  statusChanges            DealStatusHistory[]
+  payoutsMarked            Payout[]
+  clientPaymentsMarked     Deal[]              @relation("ClientPaidMarkedBy")
+  fnsCredentialsCreated    FnsCredential[]
+  commissionConfigsCreated CommissionConfig[]
+  invitesCreated           InviteCode[]        @relation("InviteCreatedBy")
+  telegramAccounts         TelegramAccount[]
+  auditEntries             AuditLog[]
+}
+
+/// Инвайт-коды регистрации риэлторов (см. §8 вопрос 3 — ждёт OK Татьяны)
+model InviteCode {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  label       String?   // метка агентства («Макромир»)
+  maxUses     Int       @default(50)
+  usedCount   Int       @default(0)
+  expiresAt   DateTime?
+  isActive    Boolean   @default(true)
+  createdById String?
+  createdAt   DateTime  @default(now())
+
+  createdBy User?  @relation("InviteCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  usedBy    User[]
+}
+
+/// ---------- РИЭЛТОР И РЕФЕРАЛКА ----------
+
+model RealtorProfile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  agencyName       String?
+  city             String?
+  telegramUsername String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referralLinks ReferralLink[]
+  deals         Deal[]
+  payouts       Payout[]
+}
+
+model ReferralLink {
+  id            String    @id @default(cuid())
+  token         String    @unique // nanoid 12, алфавит 32 — генерит @tax/core/referral
+  realtorId     String
+  label         String?
+  isActive      Boolean   @default(true)
+  deactivatedAt DateTime?
+  createdAt     DateTime  @default(now())
+  // счётчика кликов нет: заявки считаем по Deal.referralLinkId
+
+  realtor RealtorProfile @relation(fields: [realtorId], references: [id], onDelete: Cascade)
+  deals   Deal[]
+
+  @@index([realtorId])
+}
+// + raw SQL в миграции: UNIQUE INDEX ON "ReferralLink"("realtorId") WHERE "isActive" = true
+//   (инвариант «одна активная ссылка» на уровне БД; action ловит P2002 → возвращает существующую)
+
+/// ---------- КЛИЕНТ (физлицо, БЕЗ аккаунта) ----------
+
+model Client {
+  id               String   @id @default(cuid())
+  firstName        String
+  phone            String   // обязателен: без него клиента не передать девочкам (§4.5 ТЗ)
+  telegramUsername String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  deals         Deal[]
+  fnsCredential FnsCredential?
+
+  @@index([phone])
+}
+
+/// ---------- СЕКРЕТЫ ФНС (AES-256-GCM; ключ FNS_ENCRYPTION_KEY только в env) ----------
+
+model FnsCredential {
+  id       String @id @default(cuid())
+  clientId String @unique
+  // packages/crypto: authTag в хвосте ciphertext; nonce 12 байт уникальный per-field;
+  // AAD = clientId (шифртекст нельзя пересадить в чужую строку); keyVersion — ротация ключа
+  loginCiphertext    Bytes
+  loginNonce         Bytes
+  passwordCiphertext Bytes
+  passwordNonce      Bytes
+  keyVersion         Int   @default(1)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client    Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation(fields: [createdById], references: [id], onDelete: SetNull)
+}
+
+/// ---------- СТАТУСЫ (конфигурируемая таблица, не enum — §6 ТЗ) ----------
+
+model DealStatus {
+  id         String   @id @default(cuid())
+  code       String   @unique // стабильный код для авто-переходов core
+  label      String   // админ правит свободно
+  sortOrder  Int
+  isInitial  Boolean  @default(false)
+  isTerminal Boolean  @default(false)
+  isActive   Boolean  @default(true)
+  color      String?
+  createdAt  DateTime @default(now())
+
+  deals       Deal[]
+  historyFrom DealStatusHistory[] @relation("StatusFrom")
+  historyTo   DealStatusHistory[] @relation("StatusTo")
+
+  @@index([sortOrder])
+}
+// + raw SQL: UNIQUE INDEX ON "DealStatus"("isInitial") WHERE "isInitial" = true AND "isActive" = true
+
+/// ---------- СДЕЛКА ----------
+
+model Deal {
+  id     String @id @default(cuid())
+  number Int    @unique @default(autoincrement()) // для голосовых команд («по сделке 12»)
+
+  clientId       String
+  realtorId      String  // денормализованная атрибуция — живёт независимо от судьбы ссылки
+  referralLinkId String?
+  statusId       String
+
+  // --- анкета (§4.4) ---
+  submissionId            String   @unique // идемпотентность двойного тапа
+  saleAmount              Decimal  @db.Decimal(14, 2)
+  taxPaidAmount           Decimal  @db.Decimal(14, 2)
+  consentNoUnderstatement Boolean
+  consentPaymentTerms     Boolean
+  consentRatePct          Decimal  @db.Decimal(5, 2) // снапшот ставки, которую клиент ВИДЕЛ (юр. след §4.8)
+  consentAt               DateTime @default(now())
+  consentIp               String?
+  consentUserAgent        String?
+  belowThreshold          Boolean  @default(false)
+  thresholdAtSubmission   Decimal? @db.Decimal(14, 2)
+  duplicateOfDealId       String?  // мягкая дедупликация по телефону
+
+  // --- факты по ходу сделки ---
+  actualRefundAmount   Decimal?  @db.Decimal(14, 2)
+  contractSentAt       DateTime?
+  clientPaidAmount     Decimal?  @db.Decimal(14, 2) // ручная отметка — эквайринга нет
+  clientPaidAt         DateTime?
+  clientPaidMarkedById String?
+
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client             Client              @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  realtor            RealtorProfile      @relation(fields: [realtorId], references: [id], onDelete: Restrict)
+  referralLink       ReferralLink?       @relation(fields: [referralLinkId], references: [id], onDelete: SetNull)
+  status             DealStatus          @relation(fields: [statusId], references: [id], onDelete: Restrict)
+  clientPaidMarkedBy User?               @relation("ClientPaidMarkedBy", fields: [clientPaidMarkedById], references: [id], onDelete: SetNull)
+  commission         DealCommission?
+  statusHistory      DealStatusHistory[]
+  payouts            Payout[]
+  voiceCommands      VoiceCommandLog[]
+
+  @@index([realtorId, createdAt(sort: Desc)])
+  @@index([statusId])
+  @@index([referralLinkId])
+  @@index([clientId])
+  @@index([createdAt(sort: Desc)])
+}
+
+/// ---------- ИСТОРИЯ СТАТУСОВ (гибрид §6) ----------
+
+enum StatusChangeMode {
+  AUTO
+  MANUAL
+}
+
+enum ChangeSource {
+  WEB
+  TELEGRAM_VOICE
+  TELEGRAM_TEXT
+  SYSTEM
+}
+
+model DealStatusHistory {
+  id                String           @id @default(cuid())
+  dealId            String
+  fromStatusId      String?          // null при первичной установке
+  toStatusId        String
+  mode              StatusChangeMode
+  source            ChangeSource
+  changedById       String?
+  voiceCommandLogId String?
+  comment           String?          @db.Text
+  createdAt         DateTime         @default(now())
+
+  deal            Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  fromStatus      DealStatus?      @relation("StatusFrom", fields: [fromStatusId], references: [id], onDelete: Restrict)
+  toStatus        DealStatus       @relation("StatusTo", fields: [toStatusId], references: [id], onDelete: Restrict)
+  changedBy       User?            @relation(fields: [changedById], references: [id], onDelete: SetNull)
+  voiceCommandLog VoiceCommandLog? @relation(fields: [voiceCommandLogId], references: [id], onDelete: SetNull)
+
+  @@index([dealId, createdAt])
+  @@index([changedById])
+}
+
+/// ---------- КОМИССИИ (настраиваемые, версионируемые — §2 ТЗ) ----------
+
+enum CommissionBase {
+  REFUND_AMOUNT
+  CONSULTANT_FEE
+}
+
+enum ExecutorPayoutType {
+  FIXED
+  PERCENT
+}
+
+model CommissionConfig {
+  id                         String             @id @default(cuid())
+  name                       String             @default("default")
+  clientRatePct              Decimal            @db.Decimal(5, 2) // 20.00
+  realtorRatePct             Decimal            @db.Decimal(5, 2) // 15.00
+  platformRatePct            Decimal            @db.Decimal(5, 2) // 5.00
+  executorPayoutType         ExecutorPayoutType @default(FIXED)
+  executorFixedAmount        Decimal?           @db.Decimal(14, 2) // 20000.00
+  executorRatePct            Decimal?           @db.Decimal(5, 2)
+  commissionBase             CommissionBase     @default(REFUND_AMOUNT) // «от чего считать» — конфиг, не код
+  showPlatformShareToRealtor Boolean            @default(false) // §2: 5% риэлтору можно не показывать
+  minTaxThreshold            Decimal?           @db.Decimal(14, 2) // 250000.00 — единственный дом порога
+  isActive                   Boolean            @default(true)
+  effectiveFrom              DateTime           @default(now())
+  createdById                String?
+  createdAt                  DateTime           @default(now())
+
+  createdBy       User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  dealCommissions DealCommission[]
+
+  @@index([isActive, effectiveFrom])
+}
+// + raw SQL: UNIQUE INDEX ON "CommissionConfig"("isActive") WHERE "isActive" = true
+
+/// Снапшот распределения по сделке — смена ставок не переписывает старые сделки
+model DealCommission {
+  id                  String   @id @default(cuid())
+  dealId              String   @unique
+  configId            String
+  baseAmount          Decimal  @db.Decimal(14, 2)
+  clientFeeAmount     Decimal  @db.Decimal(14, 2)
+  realtorAmount       Decimal  @db.Decimal(14, 2)
+  platformAmount      Decimal  @db.Decimal(14, 2)
+  executorAmount      Decimal  @db.Decimal(14, 2)
+  consultantNetAmount Decimal  @db.Decimal(14, 2)
+  calculatedAt        DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  deal   Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  config CommissionConfig @relation(fields: [configId], references: [id], onDelete: Restrict)
+}
+
+/// ---------- ВЫПЛАТЫ (ручные отметки §4.6) ----------
+
+enum PayoutRecipient {
+  REALTOR
+  PLATFORM_AGENCY
+  EXECUTOR
+  OTHER
+}
+
+model Payout {
+  id            String          @id @default(cuid())
+  dealId        String
+  recipientType PayoutRecipient
+  realtorId     String?
+  amount        Decimal         @db.Decimal(14, 2)
+  paidAt        DateTime
+  markedById    String
+  comment       String?
+  createdAt     DateTime        @default(now())
+
+  deal     Deal            @relation(fields: [dealId], references: [id], onDelete: Restrict)
+  realtor  RealtorProfile? @relation(fields: [realtorId], references: [id], onDelete: SetNull)
+  markedBy User            @relation(fields: [markedById], references: [id], onDelete: Restrict)
+
+  @@index([dealId])
+  @@index([realtorId])
+  @@index([recipientType, paidAt])
+}
+
+/// ---------- TELEGRAM (девочки — НЕ Users) ----------
+
+enum TelegramBindingKind {
+  ADMIN
+  EXECUTOR
+  HANDOFF_CHANNEL
+}
+
+model TelegramAccount {
+  id        String              @id @default(cuid())
+  chatId    BigInt              @unique
+  kind      TelegramBindingKind
+  title     String?
+  username  String?
+  userId    String?             // связь с User только у Татьяны
+  isActive  Boolean             @default(true)
+  createdAt DateTime            @default(now())
+
+  user          User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  voiceCommands VoiceCommandLog[]
+}
+
+/// ---------- ЛОГ ГОЛОСОВЫХ КОМАНД (§4.7, используется с M3) ----------
+
+enum VoiceCommandStatus {
+  RECEIVED
+  TRANSCRIBED
+  PARSED
+  APPLIED
+  FAILED
+  REJECTED
+}
+
+model VoiceCommandLog {
+  id                String             @id @default(cuid())
+  telegramAccountId String?
+  chatId            BigInt
+  messageId         BigInt
+  fileId            String?
+  transcript        String?            @db.Text
+  parsedIntent      Json?
+  dealId            String?
+  status            VoiceCommandStatus @default(RECEIVED)
+  error             String?
+  createdAt         DateTime           @default(now())
+  processedAt       DateTime?
+
+  telegramAccount TelegramAccount?    @relation(fields: [telegramAccountId], references: [id], onDelete: SetNull)
+  deal            Deal?               @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  statusChanges   DealStatusHistory[]
+
+  @@index([dealId])
+  @@index([createdAt(sort: Desc)])
+}
+
+/// ---------- AUDIT (полиморфный, без FK — переживает обезличивание) ----------
+
+model AuditLog {
+  id                  String   @id @default(cuid())
+  actorUserId         String?
+  actorTelegramChatId BigInt?
+  action              String   // "deal.status.change", "fns.credential.read", ...
+  entityType          String
+  entityId            String
+  payload             Json?
+  ip                  String?
+  createdAt           DateTime @default(now())
+
+  actorUser User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([actorUserId, createdAt])
+  @@index([createdAt(sort: Desc)])
+}
