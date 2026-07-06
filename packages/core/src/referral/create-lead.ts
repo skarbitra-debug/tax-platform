@@ -54,26 +54,25 @@ export async function createLead(
       if (!link) return { ok: false as const, error: "LINK_NOT_FOUND" as const };
       if (!link.isActive) return { ok: false as const, error: "LINK_INACTIVE" as const };
 
-      // --- 2. Client: reuse по канон-телефону; у существующего дозаполняем только пустое
-      let client = await tx.client.findFirst({
+      // --- 2. Client: reuse-or-create по канон-телефону (phone @unique).
+      // upsert компилируется в INSERT ... ON CONFLICT — атомарно, без гонки:
+      // два одновременных сабмита с тем же телефоном не создадут дублей Client.
+      let client = await tx.client.upsert({
         where: { phone: input.phone },
-        orderBy: { createdAt: "asc" }, // при дублях телефона берём старейшего — стабильно
+        create: {
+          firstName: input.firstName,
+          phone: input.phone,
+          telegramUsername: input.telegram ?? null,
+        },
+        update: {}, // существующего здесь не трогаем — дозаполним ниже
       });
-      if (client) {
-        const fill: { firstName?: string; telegramUsername?: string } = {};
-        if (!client.firstName) fill.firstName = input.firstName; // пустое после обезличивания
-        if (!client.telegramUsername && input.telegram) fill.telegramUsername = input.telegram;
-        if (Object.keys(fill).length > 0) {
-          client = await tx.client.update({ where: { id: client.id }, data: fill });
-        }
-      } else {
-        client = await tx.client.create({
-          data: {
-            firstName: input.firstName,
-            phone: input.phone,
-            telegramUsername: input.telegram ?? null,
-          },
-        });
+      // Дозаполняем ТОЛЬКО пустые поля (firstName пуст после обезличивания 152-ФЗ,
+      // telegram мог не указываться в прошлый раз). Непустые не перетираем.
+      const fill: { firstName?: string; telegramUsername?: string } = {};
+      if (!client.firstName) fill.firstName = input.firstName;
+      if (!client.telegramUsername && input.telegram) fill.telegramUsername = input.telegram;
+      if (Object.keys(fill).length > 0) {
+        client = await tx.client.update({ where: { id: client.id }, data: fill });
       }
 
       // --- 3. Мягкая дедупликация: свежайшая ОТКРЫТАЯ сделка с тем же телефоном

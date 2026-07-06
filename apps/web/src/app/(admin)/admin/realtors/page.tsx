@@ -1,4 +1,5 @@
 import { prisma } from "@tax/db";
+import { requireRole } from "@/lib/require-role";
 import { UserStatusBadge, formatDate } from "../_lib/ui";
 
 export const metadata = { title: "Риэлторы — админ-панель" };
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic";
  * и User.status. Блокировка/разблокировка из UI — M2, здесь только просмотр.
  */
 export default async function AdminRealtorsPage() {
+  await requireRole("ADMIN"); // in-page guard (см. admin/page.tsx)
   const realtors = await prisma.realtorProfile.findMany({
     orderBy: { createdAt: "desc" },
     select: {

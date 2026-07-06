@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { botEnvSchema, loadEnv, webEnvSchema } from './env';
+import { botEnvSchema, loadEnv, seedEnvSchema, webEnvSchema } from './env';
 
 // Общая база (baseSchema) — валидные значения
 const base = {
@@ -8,10 +8,15 @@ const base = {
   APP_URL: 'http://localhost:3000',
 };
 
-// Валидный web-env целиком
+// Валидный web-env целиком (ADMIN_* сюда НЕ входят — они seed-only)
 const webValid = {
   ...base,
   AUTH_SECRET: 'a'.repeat(44), // как openssl rand -base64 33
+};
+
+// Валидный seed-env (migrate/seed-контейнер)
+const seedValid = {
+  DATABASE_URL: base.DATABASE_URL,
   ADMIN_EMAIL: 'admin@example.com',
   ADMIN_INITIAL_PASSWORD: 'change-me-8+',
 };
@@ -118,12 +123,12 @@ describe('loadEnv', () => {
   it('возвращает типизированный объект при валидном process.env', () => {
     process.env = { ...webValid } as NodeJS.ProcessEnv;
     const env = loadEnv(webEnvSchema);
-    expect(env.ADMIN_EMAIL).toBe('admin@example.com');
+    expect(env.AUTH_SECRET).toBe('a'.repeat(44));
     expect(env.PILOT_NOINDEX).toBe(true);
   });
 
   it('при невалидном env печатает перечень ключей и вызывает process.exit(1)', () => {
-    process.env = { ...base } as NodeJS.ProcessEnv; // нет AUTH_SECRET и пр.
+    process.env = { ...base } as NodeJS.ProcessEnv; // нет AUTH_SECRET
     const exitSpy = vi
       .spyOn(process, 'exit')
       .mockImplementation(((): never => {
@@ -133,9 +138,24 @@ describe('loadEnv', () => {
 
     expect(() => loadEnv(webEnvSchema)).toThrow('exit');
     expect(exitSpy).toHaveBeenCalledWith(1);
-    // в сообщении перечислены недостающие ключи
+    // в сообщении перечислен недостающий ключ
     const printed = errSpy.mock.calls.flat().join('\n');
     expect(printed).toContain('AUTH_SECRET');
-    expect(printed).toContain('ADMIN_EMAIL');
+  });
+});
+
+describe('seedEnvSchema (ADMIN_* — seed-only, не в web)', () => {
+  it('валидный seed-env проходит', () => {
+    expect(seedEnvSchema.safeParse(seedValid).success).toBe(true);
+  });
+
+  it('ADMIN_* НЕ являются частью webEnvSchema (иначе web-контейнер падал бы)', () => {
+    // web-env без ADMIN_* обязан быть валидным
+    expect(webEnvSchema.safeParse(webValid).success).toBe(true);
+  });
+
+  it('короткий ADMIN_INITIAL_PASSWORD валит seed-схему', () => {
+    const r = seedEnvSchema.safeParse({ ...seedValid, ADMIN_INITIAL_PASSWORD: 'x' });
+    expect(r.success).toBe(false);
   });
 });

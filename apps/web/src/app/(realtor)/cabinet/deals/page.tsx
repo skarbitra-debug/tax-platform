@@ -65,6 +65,7 @@ export default async function RealtorDealsPage() {
   const deals = await prisma.deal.findMany({
     where: { realtorId },
     orderBy: { createdAt: "desc" }, // покрыт индексом [realtorId, createdAt desc]
+    take: 500, // потолок выборки (пилот без пагинации; как в админ-списке)
     select: {
       id: true,
       number: true,

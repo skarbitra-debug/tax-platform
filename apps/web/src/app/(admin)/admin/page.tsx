@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@tax/db";
 import { formatRub } from "@/lib/format";
+import { requireRole } from "@/lib/require-role";
 import { StatusBadge, formatDateTime } from "./_lib/ui";
 
 export const metadata = { title: "Админ-панель" };
@@ -9,6 +10,10 @@ export const dynamic = "force-dynamic";
 
 /** [M1-7] Дашборд Татьяны: счётчики + последние заявки + входы в разделы */
 export default async function AdminPage() {
+  // In-page guard: layout не перемонтируется при клиентской навигации между
+  // разделами — сверка User.status по БД на КАЖДОЙ странице (мгновенная блокировка, §1)
+  await requireRole("ADMIN");
+
   const [totalDeals, newDeals, realtorCount, initialStatus, lastDeals] = await Promise.all([
     prisma.deal.count(),
     // «Новые» = в начальном статусе; NEW ищем по isInitial, не по code (контракт §1)

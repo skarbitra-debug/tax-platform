@@ -105,14 +105,22 @@ async function seedCommissionConfig(): Promise<void> {
   console.log("seed: конфиг комиссий default — ok");
 }
 
-/// ---------- 4. Инвайт-код пилота (§8 вопрос 3) ----------
+/// ---------- 4. Инвайт-код пилота — ТОЛЬКО в dev ----------
+// В проде предсказуемый код («PILOT-2026») — угадываемая дверь в закрытый
+// пилот (§7 ТЗ). Поэтому на проде инвайты не сеются: Татьяна (админ из seed)
+// создаёт коды со случайным INV-XXXX-XXXX через /admin/invites. Здесь — только
+// удобный фиксированный код для локальной разработки.
 async function seedInvite(): Promise<void> {
+  if (process.env.SEED_DEV !== "1") {
+    console.log("seed: инвайт-коды в проде не создаются (админ заведёт в /admin/invites)");
+    return;
+  }
   await prisma.inviteCode.upsert({
     where: { code: "PILOT-2026" },
     update: {}, // usedCount/isActive живут своей жизнью — не сбрасываем
-    create: { code: "PILOT-2026", label: "Закрытый пилот", maxUses: 100 },
+    create: { code: "PILOT-2026", label: "Dev-инвайт", maxUses: 100 },
   });
-  console.log("seed: инвайт-код PILOT-2026 — ok");
+  console.log("seed[dev]: инвайт-код PILOT-2026 — ok");
 }
 
 /// ---------- 5. Dev-данные (SEED_DEV=1): тестовый риэлтор + ссылка + 2 сделки ----------
@@ -142,16 +150,14 @@ async function seedDev(): Promise<void> {
     create: { userId: user.id, agencyName: "Dev-агентство", city: "Санкт-Петербург" },
   });
 
-  // Реферальная ссылка: партиальный индекс пускает одну активную на риэлтора,
-  // поэтому сначала ищем существующую активную и переиспользуем её.
-  let link = await prisma.referralLink.findFirst({
-    where: { realtorId: profile.id, isActive: true },
+  // Реферальная ссылка: ищем по ТОКЕНУ (@unique), а не по «активной» —
+  // иначе повторный seed после деактивации ссылки падал бы на create с P2002
+  // (токен-то остался). upsert по token идемпотентен при любом isActive.
+  const link = await prisma.referralLink.upsert({
+    where: { token: DEV_REF_TOKEN },
+    update: {}, // isActive существующей не трогаем
+    create: { token: DEV_REF_TOKEN, realtorId: profile.id, label: "dev" },
   });
-  if (!link) {
-    link = await prisma.referralLink.create({
-      data: { token: DEV_REF_TOKEN, realtorId: profile.id, label: "dev" },
-    });
-  }
 
   const statusNew = await prisma.dealStatus.findUniqueOrThrow({ where: { code: "NEW" } });
 

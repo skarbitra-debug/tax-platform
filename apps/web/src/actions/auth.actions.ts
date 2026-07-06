@@ -4,8 +4,9 @@ import { hash } from "@node-rs/argon2";
 import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { normalizeRuPhone } from "@tax/core";
 import { prisma } from "@tax/db";
-import { auth, signIn, signOut } from "@/auth";
+import { signIn, signOut } from "@/auth";
 
 /** Состояние для useActionState в формах логина/регистрации */
 export type AuthFormState = {
@@ -21,12 +22,12 @@ export type AuthFormState = {
  */
 const registerSchema = z.object({
   name: z.string().trim().min(2, "Имя — минимум 2 символа"),
+  // Единый нормализатор с анкетой клиента (@tax/core), не локальный дубль:
+  // одинаковый формат +7XXXXXXXXXX по всей платформе
   phone: z
     .string()
-    .trim()
-    .transform((v) => v.replace(/[^\d+]/g, ""))
-    .refine((v) => /^(?:\+7|7|8)\d{10}$/.test(v), "Телефон в формате +7 XXX XXX-XX-XX")
-    .transform((v) => `+7${v.slice(-10)}`),
+    .transform((v) => normalizeRuPhone(v))
+    .refine((v): v is string => v !== null, "Телефон в формате +7 XXX XXX-XX-XX"),
   email: z.string().trim().toLowerCase().email("Некорректный email"),
   password: z.string().min(10, "Пароль — минимум 10 символов"),
   inviteCode: z.string().trim().min(1, "Укажите инвайт-код"),
@@ -42,10 +43,17 @@ function isUniqueViolation(e: unknown): boolean {
   );
 }
 
-/** Открытые редиректы запрещены: принимаем только внутренние пути */
+/**
+ * Открытые редиректы запрещены: принимаем только внутренние пути.
+ * КРИТИЧНО: браузер нормализует "\" в "/", поэтому "/\evil.com" стал бы
+ * протокол-относительным "//evil.com". Отвергаем и "//", и любой backslash,
+ * и обратный слэш сразу после первого "/".
+ */
 function safeInternalPath(raw: string): string | null {
-  if (raw.startsWith("/") && !raw.startsWith("//")) return raw;
-  return null;
+  if (!raw.startsWith("/")) return null;
+  if (raw.startsWith("//")) return null;
+  if (raw.includes("\\")) return null;
+  return raw;
 }
 
 /**
@@ -154,9 +162,14 @@ export async function loginWithRedirect(
     throw e; // NEXT_REDIRECT и прочее — наверх
   }
 
-  // Кука выставлена — забираем роль из свежей сессии
-  const session = await auth();
-  const home = session?.user?.role === "ADMIN" ? "/admin" : "/cabinet";
+  // Роль — из БД, НЕ из auth(): свежая кука, выставленная signIn() внутри
+  // этого же server action, ещё не видна auth() в том же запросе
+  // (проверено вживую: админ улетал на /cabinet). Один SELECT по unique-индексу.
+  const user = await prisma.user.findUnique({
+    where: { email: email.trim().toLowerCase() },
+    select: { role: true },
+  });
+  const home = user?.role === "ADMIN" ? "/admin" : "/cabinet";
   redirect(safeInternalPath(callbackUrl) ?? home);
 }
 

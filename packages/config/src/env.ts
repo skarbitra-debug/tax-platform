@@ -49,15 +49,12 @@ export const baseSchema = z.object({
   APP_URL: z.string().url('APP_URL должен быть валидным URL (база реф-ссылок)'),
 });
 
-/** apps/web: Auth.js + seed админа + пилотные флаги. */
+/** apps/web: Auth.js + пилотные флаги. */
 export const webEnvSchema = baseSchema.extend({
   // секрет подписи JWT (Credentials-стратегия, таблиц сессий нет — план §1)
   AUTH_SECRET: z.string().min(32, 'AUTH_SECRET короче 32 символов (openssl rand -base64 33)'),
   // за reverse-proxy (Caddy) хосту доверяем всегда
   AUTH_TRUST_HOST: z.coerce.boolean().default(true),
-  // только для идемпотентного seed Татьяны; пароль потом меняется в ЛК
-  ADMIN_EMAIL: z.string().email('ADMIN_EMAIL должен быть валидным email'),
-  ADMIN_INITIAL_PASSWORD: z.string().min(8, 'ADMIN_INITIAL_PASSWORD минимум 8 символов'),
   // закрытый пилот: noindex по умолчанию ВКЛЮЧЁН — выключается явным "0"
   PILOT_NOINDEX: boolish(true),
   // AES-256-GCM ключ хранилища ФНС: генерируется в M0, обязателен с M4 —
@@ -71,6 +68,19 @@ export const webEnvSchema = baseSchema.extend({
       )
       .optional(),
   ),
+});
+
+/**
+ * Seed/migrate-контейнер (packages/db). ADMIN_* нужны ТОЛЬКО одноразовому
+ * сиду админа — НЕ приложению web (иначе web-контейнер падал бы на старте,
+ * не получив seed-only переменные от compose). Пароль потом меняется в ЛК.
+ */
+export const seedEnvSchema = z.object({
+  DATABASE_URL: z
+    .string()
+    .startsWith('postgresql://', 'ожидается postgresql://-строка подключения'),
+  ADMIN_EMAIL: z.string().email('ADMIN_EMAIL должен быть валидным email'),
+  ADMIN_INITIAL_PASSWORD: z.string().min(8, 'ADMIN_INITIAL_PASSWORD минимум 8 символов'),
 });
 
 /** apps/bot: grammY long polling. */
@@ -93,6 +103,21 @@ export const botEnvSchema = baseSchema.extend({
 export type BaseEnv = z.infer<typeof baseSchema>;
 export type WebEnv = z.infer<typeof webEnvSchema>;
 export type BotEnv = z.infer<typeof botEnvSchema>;
+export type SeedEnv = z.infer<typeof seedEnvSchema>;
+
+/**
+ * Build-safe чтение флага noindex БЕЗ полного парса схемы.
+ * generateMetadata корневого layout выполняется на пререндере статических
+ * страниц (`next build`), где секретов (AUTH_SECRET и пр.) нет — полный
+ * webEnvSchema.parse там уронил бы сборку. Флаг закрытости пилота от них
+ * не зависит, поэтому читаем его отдельно (владелец имени — по-прежнему тут).
+ * По умолчанию noindex ВКЛЮЧЁН: safe-default для закрытого пилота.
+ */
+export function pilotNoindexFromEnv(): boolean {
+  const raw = process.env.PILOT_NOINDEX;
+  if (raw === undefined || raw.trim() === '') return true;
+  return !['0', 'false', 'no', 'off'].includes(raw.trim().toLowerCase());
+}
 
 // ---------- загрузчик ----------
 

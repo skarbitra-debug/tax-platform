@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { env, flagOn } from "@/lib/env";
+import { pilotNoindexFromEnv } from "@tax/config";
 import "./globals.css";
 
 /**
  * Закрытый пилот: при PILOT_NOINDEX глушим индексацию на всех страницах
- * (план §5, ТЗ §1/§7). Функция, а не const — значение зависит от env.
+ * (план §5, ТЗ §1/§7). Читаем флаг build-safe (без полного парса env) —
+ * generateMetadata выполняется и на пререндере статических страниц, где
+ * секретов ещё нет. Полная валидация env — в instrumentation.ts (рантайм).
  */
 export function generateMetadata(): Metadata {
-  const noindex = flagOn(env().PILOT_NOINDEX);
+  const noindex = pilotNoindexFromEnv();
   return {
     title: {
       default: "Возврат налогов — партнёрская платформа",

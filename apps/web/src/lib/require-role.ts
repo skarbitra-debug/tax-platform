@@ -24,9 +24,11 @@ export async function requireRole(role: AppRole) {
     select: { role: true, status: true },
   });
 
-  // Удалён или не ACTIVE (BLOCKED/PENDING) → отказ, невзирая на живой JWT
+  // Удалён или не ACTIVE (BLOCKED/PENDING) → гасим JWT и уводим на /login.
+  // НЕ redirect("/login") напрямую: живой токен → middleware вернул бы «домой»
+  // → сюда → бесконечный цикл. Route-хендлер вне matcher чистит куку.
   if (!dbUser || dbUser.status !== "ACTIVE") {
-    redirect("/login?error=blocked");
+    redirect("/api/session/end?reason=blocked");
   }
 
   // Роль сверяем тоже по БД (свежее токена); не своя зона → домой по роли

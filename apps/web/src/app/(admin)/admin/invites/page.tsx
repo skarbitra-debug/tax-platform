@@ -1,5 +1,6 @@
 import { prisma } from "@tax/db";
 import { revokeInvite } from "@/actions/invite.actions";
+import { requireRole } from "@/lib/require-role";
 import { formatDate } from "../_lib/ui";
 import { InviteForm } from "./invite-form";
 
@@ -31,6 +32,7 @@ function inviteState(inv: {
 
 /** [M1-7] Инвайт-коды: создание, список, отзыв — закрытость пилота (§8-3) */
 export default async function AdminInvitesPage() {
+  await requireRole("ADMIN"); // in-page guard (см. admin/page.tsx)
   const invites = await prisma.inviteCode.findMany({
     orderBy: { createdAt: "desc" },
   });

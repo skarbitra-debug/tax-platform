@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@tax/db";
 import { formatRub } from "@/lib/format";
+import { requireRole } from "@/lib/require-role";
 import { FlagBadge, StatusBadge, formatDateTime } from "../_lib/ui";
 
 export const metadata = { title: "Заявки — админ-панель" };
@@ -25,6 +26,7 @@ export default async function AdminDealsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireRole("ADMIN"); // in-page guard (см. admin/page.tsx)
   const sp = await searchParams;
   // Значения из URL уходят в where как есть — это только id для равенства,
   // Prisma параметризует; несуществующий id даст пустой список, не ошибку

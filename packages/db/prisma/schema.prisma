@@ -102,15 +102,16 @@ model ReferralLink {
 model Client {
   id               String   @id @default(cuid())
   firstName        String
-  phone            String   // обязателен: без него клиента не передать девочкам (§4.5 ТЗ)
+  // обязателен: без него клиента не передать девочкам (§4.5 ТЗ).
+  // @unique: один телефон = один физлицо. Делает reuse-by-phone в createLead
+  // атомарным (upsert ON CONFLICT) — иначе гонка двух сабмитов плодит дублей Client.
+  phone            String   @unique
   telegramUsername String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   deals         Deal[]
   fnsCredential FnsCredential?
-
-  @@index([phone])
 }
 
 /// ---------- СЕКРЕТЫ ФНС (AES-256-GCM; ключ FNS_ENCRYPTION_KEY только в env) ----------
