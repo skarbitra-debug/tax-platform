@@ -14,6 +14,10 @@ packages/db/generated/
 .env.*
 !.env.example
 
+# playwright (e2e) — артефакты прогонов
+test-results/
+playwright-report/
+
 # misc
 .DS_Store
 *.log

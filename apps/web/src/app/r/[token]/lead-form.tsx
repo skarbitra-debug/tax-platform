@@ -1,0 +1,242 @@
+"use client";
+
+import { useActionState, useEffect, useState } from "react";
+import { submitApplication, type LeadFormState } from "@/actions/deal.actions";
+
+const initialState: LeadFormState = { ok: false };
+
+/**
+ * Живое форматирование разрядов: "1200000" → "1 200 000".
+ * Только цифры, ведущие нули срезаются, 13 знаков хватает на границу 2 млрд.
+ */
+function formatRubInput(raw: string): string {
+  const digits = raw.replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, 13);
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
+
+/** Числовое значение из отформатированной строки ("1 200 000" → 1200000) */
+function rubValue(formatted: string): number | null {
+  const digits = formatted.replace(/\D/g, "");
+  return digits ? Number(digits) : null;
+}
+
+/**
+ * submissionId генерируется при монтировании (идемпотентность двойного тапа, план §4).
+ * crypto.randomUUID есть только в secure context — для http-dev в WebView
+ * держим ручной RFC4122-v4 fallback на getRandomValues.
+ */
+function makeSubmissionId(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/** Ошибка конкретного поля из Zod flatten() — как в register-form */
+function FieldError({ errors }: { errors?: string[] }) {
+  if (!errors?.length) return null;
+  return <p className="mt-1.5 text-sm text-red-600">{errors[0]}</p>;
+}
+
+// Крупные поля под палец (16px+ — iOS не зумит), mobile-first 360px
+const inputCls =
+  "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100";
+const labelCls = "mb-1.5 block text-sm font-medium text-slate-700";
+
+export function LeadForm({
+  token,
+  ratePctLabel,
+  thresholdRub,
+  thresholdLabel,
+}: {
+  token: string;
+  /** Ставка из активного CommissionConfig, отформатирована сервером ("20") */
+  ratePctLabel: string;
+  /** Порог из конфига в рублях (null — порога нет) — для неблокирующего hint */
+  thresholdRub: number | null;
+  thresholdLabel: string | null;
+}) {
+  const [state, formAction, pending] = useActionState(submitApplication, initialState);
+  const fe = state.fieldErrors ?? {};
+
+  // ВСЕ поля controlled: React 19 сбрасывает uncontrolled-форму после action,
+  // а нам нельзя терять ввод при ошибке валидации/устаревшей ссылке (план §4)
+  const [firstName, setFirstName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [telegram, setTelegram] = useState("");
+  const [salePrice, setSalePrice] = useState("");
+  const [taxPaid, setTaxPaid] = useState("");
+  const [consentClean, setConsentClean] = useState(false);
+  const [consentPay, setConsentPay] = useState(false);
+
+  // Генерация в effect, не в useState-init: иначе SSR и гидрация дадут
+  // разные UUID → hydration mismatch на hidden-инпуте
+  const [submissionId, setSubmissionId] = useState("");
+  useEffect(() => {
+    setSubmissionId(makeSubmissionId());
+  }, []);
+
+  // Успех — на месте формы; номер заявки клиенту не показываем
+  if (state.ok) {
+    return (
+      <div
+        data-testid="quizSuccess"
+        className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center"
+      >
+        <h2 className="text-xl font-bold text-emerald-800">Заявка принята!</h2>
+        <p className="mt-2 text-base text-emerald-700">
+          С вами свяжутся в Telegram или по телефону.
+        </p>
+      </div>
+    );
+  }
+
+  // Неблокирующий hint про порог (план §1: анкета НЕ отсекает — belowThreshold)
+  const tax = rubValue(taxPaid);
+  const showThresholdHint =
+    thresholdRub !== null && thresholdLabel !== null && tax !== null && tax > 0 && tax < thresholdRub;
+
+  return (
+    <form action={formAction} data-testid="quizForm" className="space-y-5">
+      <input type="hidden" name="token" value={token} />
+      <input type="hidden" name="submissionId" value={submissionId} />
+
+      <label className="block">
+        <span className={labelCls}>Ваше имя</span>
+        <input
+          type="text"
+          name="firstName"
+          required
+          autoComplete="given-name"
+          className={inputCls}
+          placeholder="Иван"
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
+        />
+        <FieldError errors={fe.firstName} />
+      </label>
+
+      <label className="block">
+        <span className={labelCls}>Телефон</span>
+        <input
+          type="tel"
+          name="phone"
+          required
+          autoComplete="tel"
+          inputMode="tel"
+          className={inputCls}
+          placeholder="+7 912 345-67-89"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+        />
+        <p className="mt-1 text-xs text-slate-500">Можно в любом виде: 8…, 7… или +7…</p>
+        <FieldError errors={fe.phone} />
+      </label>
+
+      <label className="block">
+        <span className={labelCls}>
+          Ник в Telegram <span className="font-normal text-slate-400">(необязательно)</span>
+        </span>
+        <input
+          type="text"
+          name="telegram"
+          autoComplete="off"
+          autoCapitalize="none"
+          className={inputCls}
+          placeholder="@username — если удобнее переписка"
+          value={telegram}
+          onChange={(e) => setTelegram(e.target.value)}
+        />
+        <FieldError errors={fe.telegram} />
+      </label>
+
+      <label className="block">
+        <span className={labelCls}>За сколько продали недвижимость, ₽</span>
+        <input
+          type="text"
+          name="salePriceRub"
+          required
+          inputMode="numeric"
+          autoComplete="off"
+          className={inputCls}
+          placeholder="12 000 000"
+          value={salePrice}
+          onChange={(e) => setSalePrice(formatRubInput(e.target.value))}
+        />
+        <FieldError errors={fe.salePriceRub} />
+      </label>
+
+      <label className="block">
+        <span className={labelCls}>Сколько налога заплатили, ₽</span>
+        <input
+          type="text"
+          name="taxPaidRub"
+          required
+          inputMode="numeric"
+          autoComplete="off"
+          className={inputCls}
+          placeholder="700 000"
+          value={taxPaid}
+          onChange={(e) => setTaxPaid(formatRubInput(e.target.value))}
+        />
+        {showThresholdHint && (
+          <p className="mt-1.5 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Обычно берём в работу от {thresholdLabel} ₽ — заявка будет рассмотрена индивидуально.
+          </p>
+        )}
+        <FieldError errors={fe.taxPaidRub} />
+      </label>
+
+      {/* Тексты галок — ДОСЛОВНО из ТЗ §4.4; ставка в №2 — из конфига, не хардкод */}
+      <div className="space-y-3 rounded-xl bg-slate-50 p-4">
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            name="consentNoUnderstatement"
+            className="mt-0.5 h-5 w-5 shrink-0 rounded accent-blue-600"
+            checked={consentClean}
+            onChange={(e) => setConsentClean(e.target.checked)}
+          />
+          <span className="text-sm leading-snug text-slate-700">
+            Подтверждаю, что не было занижений и сумм сверх договора
+          </span>
+        </label>
+        <FieldError errors={fe.consentNoUnderstatement} />
+
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            name="consentPaymentTerms"
+            className="mt-0.5 h-5 w-5 shrink-0 rounded accent-blue-600"
+            checked={consentPay}
+            onChange={(e) => setConsentPay(e.target.checked)}
+          />
+          <span className="text-sm leading-snug text-slate-700">
+            Понимаю и согласен с порядком оплаты — готов платить {ratePctLabel}%
+          </span>
+        </label>
+        <FieldError errors={fe.consentPaymentTerms} />
+      </div>
+
+      {state.formError && (
+        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{state.formError}</p>
+      )}
+
+      <button
+        type="submit"
+        data-testid="quizSubmit"
+        disabled={pending || !submissionId}
+        className="w-full rounded-xl bg-blue-600 px-4 py-3.5 text-base font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+      >
+        {pending ? "Отправляем…" : "Отправить заявку"}
+      </button>
+
+      <p className="text-center text-xs text-slate-400">
+        Никаких предоплат — оплата только после получения денег на ваш счёт.
+      </p>
+    </form>
+  );
+}

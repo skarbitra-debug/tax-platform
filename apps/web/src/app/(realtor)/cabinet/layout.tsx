@@ -18,13 +18,14 @@ export default async function CabinetLayout({ children }: { children: ReactNode 
             <Link href="/cabinet" className="text-lg font-bold tracking-tight">
               Кабинет партнёра
             </Link>
-            <nav className="hidden items-center gap-4 text-sm text-slate-600 sm:flex">
+            {/* Навигация видима и на мобильном: «Заявки» — основной сценарий M1 */}
+            <nav className="flex items-center gap-4 text-sm text-slate-600">
               <Link href="/cabinet" className="hover:text-slate-900">
                 Главная
               </Link>
-              <span className="cursor-default text-slate-400" title="Появится в M1">
-                Мои заявки (скоро)
-              </span>
+              <Link href="/cabinet/deals" className="hover:text-slate-900">
+                Заявки
+              </Link>
             </nav>
           </div>
           <div className="flex items-center gap-3">

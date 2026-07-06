@@ -17,9 +17,11 @@
     "db:migrate": "pnpm --filter @tax/db exec prisma migrate dev",
     "db:deploy": "pnpm --filter @tax/db exec prisma migrate deploy",
     "db:studio": "pnpm --filter @tax/db exec prisma studio",
-    "db:seed": "pnpm --filter @tax/db seed"
+    "db:seed": "pnpm --filter @tax/db seed",
+    "e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2"
   }
