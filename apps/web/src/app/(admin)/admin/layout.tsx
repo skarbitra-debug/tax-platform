@@ -26,6 +26,12 @@ export default async function AdminLayout({ children }: { children: ReactNode })
               <Link href="/admin/invites" className="hover:text-white">
                 Инвайты
               </Link>
+              <Link href="/admin/settings/commissions" className="hover:text-white">
+                Ставки
+              </Link>
+              <Link href="/admin/settings/statuses" className="hover:text-white">
+                Статусы
+              </Link>
             </nav>
           </div>
           <div className="flex items-center gap-3">

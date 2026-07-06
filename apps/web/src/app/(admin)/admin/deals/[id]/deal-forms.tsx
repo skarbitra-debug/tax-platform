@@ -6,6 +6,7 @@ import {
   addPayoutAction,
   changeStatusAction,
   markClientPaidAction,
+  markContractSentAction,
   setRefundAction,
 } from "@/actions/deal-admin.actions";
 
@@ -104,6 +105,27 @@ export function ClientPaidForm({ dealId, suggested }: { dealId: string; suggeste
       </button>
       <Feedback state={state} />
     </form>
+  );
+}
+
+/** Отметка «договор отправлен» (§4.8; механизм подписания — §11.3, TODO) */
+export function ContractForm({ dealId, sentAt }: { dealId: string; sentAt: string | null }) {
+  const [state, action, pending] = useActionState(markContractSentAction, {} as DealActionState);
+  return (
+    <div className="space-y-2">
+      {sentAt ? (
+        <p className="text-sm text-emerald-700">Договор отправлен: {sentAt}</p>
+      ) : (
+        <p className="text-sm text-slate-500">Договор ещё не отправлен.</p>
+      )}
+      <form action={action} className="flex items-center gap-3">
+        <input type="hidden" name="dealId" value={dealId} />
+        <button type="submit" disabled={pending} className={btnCls}>
+          {sentAt ? "Отправить повторно" : "Отметить «договор отправлен»"}
+        </button>
+        <Feedback state={state} />
+      </form>
+    </div>
   );
 }
 

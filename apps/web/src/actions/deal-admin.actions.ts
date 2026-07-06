@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { changeDealStatus, recalcDealCommission } from "@tax/core";
+import { changeDealStatus, changeDealStatusByCode, recalcDealCommission } from "@tax/core";
 import { Prisma, prisma } from "@tax/db";
 import { requireRole } from "@/lib/require-role";
 
@@ -101,6 +101,38 @@ export async function markClientPaidAction(
   });
 
   revalidatePath(`/admin/deals/${parsed.data.dealId}`);
+  return { ok: true };
+}
+
+/**
+ * Отметить «договор отправлен клиенту» (§4.8): фиксируем contractSentAt и
+ * двигаем статус на CONTRACT_SENT (авто-переход по событию, §6).
+ * ВНИМАНИЕ: механизм самого подписания (галка/ЭЦП/сторонний сервис) — §11.3,
+ * пока не определён; здесь трекается только факт отправки.
+ */
+export async function markContractSentAction(
+  _prev: DealActionState,
+  formData: FormData,
+): Promise<DealActionState> {
+  const session = await requireRole("ADMIN");
+  const dealId = String(formData.get("dealId") ?? "");
+  if (!dealId) return { error: "Сделка не указана." };
+
+  await prisma.deal.update({
+    where: { id: dealId },
+    data: { contractSentAt: new Date() },
+  });
+  // авто-переход статуса по событию «договор отправлен»
+  await changeDealStatusByCode({
+    dealId,
+    toStatusCode: "CONTRACT_SENT",
+    mode: "AUTO",
+    source: "WEB",
+    actorUserId: session.user.id,
+    comment: "Договор отправлен клиенту",
+  });
+
+  revalidatePath(`/admin/deals/${dealId}`);
   return { ok: true };
 }
 
