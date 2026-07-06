@@ -60,6 +60,10 @@ services:
       AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-true} # за reverse-proxy (caddy)
       PILOT_NOINDEX: ${PILOT_NOINDEX:-1}
       FNS_ENCRYPTION_KEY: ${FNS_ENCRYPTION_KEY:-} # обязателен с M4, схема @tax/config решает
+      # M3: передача заявки в noname-канал (§4.5) уходит ИЗ WEB через Bot API —
+      # без этих двух web молча пропускает хендофф (заявка остаётся только в ЛК)
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHANNEL_ID: ${TELEGRAM_CHANNEL_ID:-}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -80,9 +84,14 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL}
+      # APP_URL обязателен в botEnvSchema (baseSchema) — без него бот падает
+      # на fail-fast валидации env при старте контейнера
+      APP_URL: ${APP_URL:?APP_URL обязателен}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN обязателен}
-      TELEGRAM_CHANNEL_ID: ${TELEGRAM_CHANNEL_ID:-} # optional до M2
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}     # M3, голосовой ассистент
+      TELEGRAM_CHANNEL_ID: ${TELEGRAM_CHANNEL_ID:-}   # канал девочек (M3)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}       # M3, разбор голосовых команд
+      TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID:-} # чат Татьяны: авторизация голоса (§4.7)
+      VOICE_LLM_MODEL: ${VOICE_LLM_MODEL:-claude-haiku-4-5-20251001}
     depends_on:
       migrate:
         condition: service_completed_successfully

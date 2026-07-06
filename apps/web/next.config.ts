@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
   // корень монорепо: без этого file tracing не захватывает workspace-пакеты
   outputFileTracingRoot: path.join(__dirname, "../.."),
   // пакеты @tax/* не собираются (exports -> ./src/index.ts), транспилирует web
-  transpilePackages: ["@tax/config", "@tax/core", "@tax/db"],
+  transpilePackages: ["@tax/config", "@tax/core", "@tax/crypto", "@tax/db"],
 };
 
 export default nextConfig;

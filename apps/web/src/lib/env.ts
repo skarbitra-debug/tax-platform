@@ -19,10 +19,5 @@ export function env(): WebEnv {
   return cached;
 }
 
-/**
- * Флаги в .env пишутся как 1/0 (см. PILOT_NOINDEX в .env.example).
- * Хелпер терпим к типу, который вернёт схема (boolean после coerce или строка).
- */
-export function flagOn(value: unknown): boolean {
-  return value === true || value === 1 || value === "1" || value === "true";
-}
+// flagOn удалён: единственный потребитель (noindex в layout) перешёл на
+// build-safe pilotNoindexFromEnv из @tax/config (фиксы ревью M0/M1)

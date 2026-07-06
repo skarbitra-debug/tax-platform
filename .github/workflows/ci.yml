@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # версия pnpm берётся из package.json#packageManager (11.11.0)
+      # версия pnpm берётся из package.json#packageManager (11.10.0)
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
