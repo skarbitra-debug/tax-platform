@@ -114,6 +114,9 @@ export const botEnvSchema = baseSchema.extend({
   ),
   // модель Claude для разбора голосовых команд (дёшево и быстро — haiku)
   VOICE_LLM_MODEL: z.string().default('claude-haiku-4-5-20251001'),
+  // Whisper (self-hosted STT): размер модели ggml/onnx.
+  // tiny/base — быстро, но хуже русский; small — баланс; medium — точнее, тяжелее.
+  WHISPER_MODEL: z.enum(['tiny', 'base', 'small', 'medium']).default('small'),
 });
 
 export type BaseEnv = z.infer<typeof baseSchema>;

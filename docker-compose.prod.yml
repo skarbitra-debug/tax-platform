@@ -92,10 +92,14 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}       # M3, разбор голосовых команд
       TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID:-} # чат Татьяны: авторизация голоса (§4.7)
       VOICE_LLM_MODEL: ${VOICE_LLM_MODEL:-claude-haiku-4-5-20251001}
+      WHISPER_MODEL: ${WHISPER_MODEL:-small} # размер модели STT (§4.7)
+    volumes:
+      # кэш модели Whisper — качается один раз, переживает рестарты бота
+      - whisper_cache:/app/.cache/transformers
     depends_on:
       migrate:
         condition: service_completed_successfully
-    networks: [internal, edge] # edge: long polling требует выхода к api.telegram.org
+    networks: [internal, edge] # edge: long polling требует выхода к api.telegram.org (+ CDN модели Whisper при первом старте)
 
   caddy:
     image: caddy:2-alpine
@@ -123,3 +127,4 @@ volumes:
   pgdata:
   caddy_data:
   caddy_config:
+  whisper_cache: # модель Whisper STT (§4.7) — не качать при каждом рестарте
