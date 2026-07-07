@@ -1,15 +1,15 @@
-import { applyVoiceCommand, buildVoiceContext } from "@tax/core";
+import { applyVoiceCommand, buildVoiceContext, parseVoiceCommand } from "@tax/core";
 import { prisma } from "@tax/db";
 import type { Context } from "grammy";
 import { env } from "./env";
-import { parseVoiceIntent } from "./intent";
 import { createStt, isSttConfigured } from "./stt";
 
 /**
  * Обработчик голосовой команды смены статуса (§4.7).
- * Конвейер: авторизация чата → скачивание OGG → STT → разбор Claude →
+ * Конвейер: авторизация чата → скачивание OGG → Whisper (STT) → разбор
+ * ПРАВИЛАМИ (parseVoiceCommand из @tax/core, без облака/LLM) →
  * applyVoiceCommand (двигает статус, source=TELEGRAM_VOICE, пишет
- * VoiceCommandLog). Каждый внешний шаг за сменным адаптером.
+ * VoiceCommandLog). Всё локально: голос не покидает сервер, ключи не нужны.
  */
 const stt = createStt();
 
@@ -31,14 +31,7 @@ export async function handleVoice(ctx: Context): Promise<void> {
     return;
   }
 
-  if (!env.ANTHROPIC_API_KEY) {
-    await ctx.reply("Голосовой ассистент не настроен: нет ключа разбора команд.");
-    return;
-  }
-
-  // Guard ДО скачивания файла: пока STT-движок не выбран/не реализован,
-  // честно отвечаем «в настройке» вместо ложного «попробуйте ещё раз»
-  // (заглушка createStt всегда бросает — ретраи бесполезны)
+  // Guard ДО скачивания файла: если STT-движок не готов — честно «в настройке»
   if (!isSttConfigured()) {
     await ctx.reply(
       "Голосовой ассистент в настройке: распознавание речи ещё не подключено. " +
@@ -60,12 +53,13 @@ export async function handleVoice(ctx: Context): Promise<void> {
       await (await fetch(url, { signal: AbortSignal.timeout(15_000) })).arrayBuffer(),
     );
 
-    // 2. Речь → текст (STT-адаптер; движок выбирается позже)
+    // 2. Речь → текст (Whisper, локально)
     const transcript = await stt.transcribe(oggBytes);
 
-    // 3. Разбор намерения Claude по каталогу реальных сделок/статусов
+    // 3. Разбор ПРАВИЛАМИ по каталогу реальных сделок/статусов (без облака)
     const context = await buildVoiceContext();
-    const intent = await parseVoiceIntent(transcript, context);
+    const parsed = parseVoiceCommand(transcript, context);
+    const intent = { transcript, dealNumber: parsed.dealNumber, targetStatusCode: parsed.targetStatusCode, note: null };
 
     // 4. Применить (со сквозным логом и трассировкой в истории статусов)
     const actor = await prisma.telegramAccount.findFirst({

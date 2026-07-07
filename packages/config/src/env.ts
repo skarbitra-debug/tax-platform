@@ -105,16 +105,16 @@ export const botEnvSchema = baseSchema.extend({
       .regex(/^-100\d+$/, 'TELEGRAM_CHANNEL_ID: ожидается формат -100xxxxxxxxxx')
       .optional(),
   ),
-  // голосовой ассистент — M3
+  // НЕ требуется для голоса: команды разбираются правилами локально
+  // (parseVoiceCommand). Зарезервировано под будущие AI-фичи. Optional.
   ANTHROPIC_API_KEY: emptyAsUndefined(z.string().min(1).optional()),
+  VOICE_LLM_MODEL: emptyAsUndefined(z.string().optional()),
   // чат Татьяны: ТОЛЬКО он может голосом двигать статусы (§4.7). Без него
   // голосовой ассистент отвечает «не авторизовано». Числовой chat_id.
   TELEGRAM_ADMIN_CHAT_ID: emptyAsUndefined(
     z.string().regex(/^-?\d+$/, 'TELEGRAM_ADMIN_CHAT_ID: числовой chat_id').optional(),
   ),
-  // модель Claude для разбора голосовых команд (дёшево и быстро — haiku)
-  VOICE_LLM_MODEL: z.string().default('claude-haiku-4-5-20251001'),
-  // Whisper (self-hosted STT): размер модели ggml/onnx.
+  // Whisper (self-hosted STT): размер модели onnx.
   // tiny/base — быстро, но хуже русский; small — баланс; medium — точнее, тяжелее.
   WHISPER_MODEL: z.enum(['tiny', 'base', 'small', 'medium']).default('small'),
 });

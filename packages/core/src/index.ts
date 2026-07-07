@@ -58,3 +58,9 @@ export {
   type VoiceCommandMeta,
   type ApplyVoiceResult,
 } from "./voice/apply";
+// разбор команды правилами (без LLM/облака)
+export {
+  parseVoiceCommand,
+  type VoiceParseContext,
+  type VoiceParseResult,
+} from "./voice/parse";
