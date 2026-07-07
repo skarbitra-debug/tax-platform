@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { DashboardPreview } from "./dashboard-preview";
+import { EarningsCalculator } from "./earnings-calculator";
 
 /**
  * [M5] Витрина для риэлтора (§4.1). Тёмный премиум-дизайн по референсу
@@ -204,6 +206,46 @@ export default function MarketingPage() {
               <p className="mt-2 text-sm text-white/55">{b.text}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* СКОЛЬКО ЗАРАБОТАЕТЕ */}
+      <section className="mx-auto max-w-5xl px-4 py-20">
+        <h2 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
+          Сколько вы заработаете
+        </h2>
+        <p className="mx-auto mt-3 max-w-2xl text-center text-white/50">
+          Подвигайте ползунки — увидите примерный доход с вашего потока клиентов.
+        </p>
+        <div className="mt-10">
+          <EarningsCalculator />
+        </div>
+      </section>
+
+      {/* ВСЁ ПОД КОНТРОЛЕМ */}
+      <section className="mx-auto max-w-5xl px-4 py-20">
+        <div className="grid items-center gap-10 lg:grid-cols-2">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Всё под контролем</h2>
+            <p className="mt-4 text-white/60">
+              Личный кабинет: реф-ссылка в один клик, все заявки со статусами — от «новой» до
+              «выплаты сделаны». Вы всегда видите, на каком этапе каждый клиент и сколько
+              заработали.
+            </p>
+            <ul className="mt-6 space-y-3 text-sm text-white/70">
+              {[
+                "Персональная ссылка и копирование в один клик",
+                "Статус каждой заявки в реальном времени",
+                "Прозрачный подсчёт вознаграждения",
+              ].map((t) => (
+                <li key={t} className="flex items-start gap-2">
+                  <span className="text-emerald-gradient mt-0.5">✓</span>
+                  {t}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <DashboardPreview />
         </div>
       </section>
 
