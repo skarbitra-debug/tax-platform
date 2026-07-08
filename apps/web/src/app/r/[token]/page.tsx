@@ -106,11 +106,11 @@ export default async function ClientReferralPage({
   const ratePctLabel = fmtPct.format(clientRatePct);
   const thresholdLabel = minTaxThreshold !== null ? fmtRub.format(minTaxThreshold) : null;
 
-  return (
-    <main className="mx-auto w-full max-w-md px-4 py-8">
-      {/* Плавный скролл для якоря-CTA; страница одна — глобальный css не трогаем */}
-      <style>{`html { scroll-behavior: smooth; }`}</style>
-
+  // Объяснялка передаётся В клиентский компонент: после успешной отправки
+  // он заменяет ВЕСЬ экран подтверждением (без неё и без CTA) — иначе клиент
+  // видел бы «Заявка принята» и одновременно кнопку «Оставить заявку»
+  const intro = (
+    <>
       {/* --- Объяснялка --- */}
       <p className="mb-3 inline-block rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
         Приглашение от вашего риэлтора
@@ -155,20 +155,23 @@ export default async function ClientReferralPage({
       >
         Оставить заявку
       </a>
+    </>
+  );
 
-      {/* --- Анкета (та же страница, ниже; scroll-mt — воздух при якорном скролле) --- */}
-      <section id="lead-form" className="mt-10 scroll-mt-6">
-        <h2 className="text-xl font-bold">Заявка на возврат</h2>
-        <p className="mb-5 mt-1 text-sm text-slate-500">
-          Точную сумму возврата посчитаем по документам — анкета ни к чему не обязывает.
-        </p>
-        <LeadForm
-          token={token}
-          ratePctLabel={ratePctLabel}
-          thresholdRub={minTaxThreshold}
-          thresholdLabel={thresholdLabel}
-        />
-      </section>
+  return (
+    <main className="mx-auto w-full max-w-md px-4 py-8">
+      {/* Плавный скролл для якоря-CTA; страница одна — глобальный css не трогаем */}
+      <style>{`html { scroll-behavior: smooth; }`}</style>
+
+      {/* Анкета — та же страница; intro и форма живут внутри LeadForm,
+          чтобы успех заменял всё разом (секция #lead-form — внутри) */}
+      <LeadForm
+        token={token}
+        ratePctLabel={ratePctLabel}
+        thresholdRub={minTaxThreshold}
+        thresholdLabel={thresholdLabel}
+        intro={intro}
+      />
     </main>
   );
 }

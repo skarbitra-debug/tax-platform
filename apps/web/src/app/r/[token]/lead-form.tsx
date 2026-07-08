@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, type ReactNode } from "react";
 import { submitApplication, type LeadFormState } from "@/actions/deal.actions";
 
 const initialState: LeadFormState = { ok: false };
@@ -51,8 +51,11 @@ export function LeadForm({
   ratePctLabel,
   thresholdRub,
   thresholdLabel,
+  intro,
 }: {
   token: string;
+  /** Объяснялка (бейдж, заголовок, шаги, CTA) — при успехе скрывается вместе с формой */
+  intro: ReactNode;
   /** Ставка из активного CommissionConfig, отформатирована сервером ("20") */
   ratePctLabel: string;
   /** Порог из конфига в рублях (null — порога нет) — для неблокирующего hint */
@@ -79,17 +82,32 @@ export function LeadForm({
     setSubmissionId(makeSubmissionId());
   }, []);
 
-  // Успех — на месте формы; номер заявки клиенту не показываем
+  // Успех: ВЕСЬ экран заменяется подтверждением — объяснялка, CTA и форма
+  // исчезают (иначе клиент видел бы «Заявка принята» и одновременно кнопку
+  // «Оставить заявку» — сбивает с толку). Номер заявки клиенту не показываем.
+  const ok = state.ok;
+  useEffect(() => {
+    if (ok) window.scrollTo({ top: 0 });
+  }, [ok]);
+
   if (state.ok) {
     return (
       <div
         data-testid="quizSuccess"
-        className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center"
+        className="flex min-h-[70vh] flex-col items-center justify-center text-center"
       >
-        <h2 className="text-xl font-bold text-emerald-800">Заявка принята!</h2>
-        <p className="mt-2 text-base text-emerald-700">
-          С вами свяжутся в Telegram или по телефону.
+        <span
+          className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-3xl"
+          aria-hidden
+        >
+          ✓
+        </span>
+        <h1 className="mt-5 text-2xl font-bold text-emerald-800">Заявка принята!</h1>
+        <p className="mt-3 max-w-sm text-base leading-relaxed text-slate-600">
+          Мы проверим данные и свяжемся с вами в Telegram или по телефону —
+          обычно в течение 1–2 рабочих дней.
         </p>
+        <p className="mt-4 text-sm text-slate-400">Страницу можно закрыть.</p>
       </div>
     );
   }
@@ -100,7 +118,14 @@ export function LeadForm({
     thresholdRub !== null && thresholdLabel !== null && tax !== null && tax > 0 && tax < thresholdRub;
 
   return (
-    <form action={formAction} data-testid="quizForm" className="space-y-5">
+    <>
+      {intro}
+      <section id="lead-form" className="mt-10 scroll-mt-6">
+        <h2 className="text-xl font-bold">Заявка на возврат</h2>
+        <p className="mb-5 mt-1 text-sm text-slate-500">
+          Точную сумму возврата посчитаем по документам — анкета ни к чему не обязывает.
+        </p>
+        <form action={formAction} data-testid="quizForm" className="space-y-5">
       <input type="hidden" name="token" value={token} />
       <input type="hidden" name="submissionId" value={submissionId} />
 
@@ -234,9 +259,11 @@ export function LeadForm({
         {pending ? "Отправляем…" : "Отправить заявку"}
       </button>
 
-      <p className="text-center text-xs text-slate-400">
-        Никаких предоплат — оплата только после получения денег на ваш счёт.
-      </p>
-    </form>
+          <p className="text-center text-xs text-slate-400">
+            Никаких предоплат — оплата только после получения денег на ваш счёт.
+          </p>
+        </form>
+      </section>
+    </>
   );
 }
