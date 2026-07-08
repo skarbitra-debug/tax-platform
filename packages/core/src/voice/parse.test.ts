@@ -65,6 +65,19 @@ describe("parseVoiceCommand (§4.7, без LLM)", () => {
     expect(r.targetStatusCode).toBeNull();
   });
 
+  it("служебное слово НЕ включает статус: «по этому клиенту 12 такие-то обновления» (ТЗ §4.7)", () => {
+    // «клиенту» ≠ команда «Клиент оплатил»: без слова «оплатил» статус не матчится
+    const r = parseVoiceCommand("по этому клиенту 12 такие-то обновления", ctx);
+    expect(r.dealNumber).toBe(12);
+    expect(r.targetStatusCode).toBeNull();
+  });
+
+  it("«сделка 5 новый договор» не путает «Новая заявка» с «Договор отправлен»", () => {
+    // по одному слову от каждого двухсловного статуса — ни один не набирает >1/2
+    const r = parseVoiceCommand("сделка 5 новый договор", ctx);
+    expect(r.targetStatusCode).toBeNull();
+  });
+
   it("не путает «Проверка ФНС» и «Новая заявка» по одному общему слову", () => {
     // «заявка» есть только в NEW — должен выбрать NEW, не другой
     expect(parseVoiceCommand("сделка 5 новая заявка", ctx).targetStatusCode).toBe("NEW");

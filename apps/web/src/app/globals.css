@@ -44,17 +44,17 @@ body {
   background: var(--landing-card);
   border: 1px solid var(--landing-border);
 }
-/* градиентный текст (изумруд) для акцентных цифр/слов */
+/* Градиентный текст (изумруд) для акцентных цифр/слов.
+   Фолбэк: без поддержки background-clip:text текст остаётся сплошным
+   изумрудным, а не прозрачным-невидимым. */
 .text-emerald-gradient {
-  background: linear-gradient(135deg, var(--emerald), var(--emerald-light));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--emerald-light);
 }
-/* градиентный заголовок: белый → синий → изумруд */
-.text-hero-gradient {
-  background: linear-gradient(135deg, #fff 0%, var(--accent) 50%, var(--emerald) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .text-emerald-gradient {
+    background: linear-gradient(135deg, var(--emerald), var(--emerald-light));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 }

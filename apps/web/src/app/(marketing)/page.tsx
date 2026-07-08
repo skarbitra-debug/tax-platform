@@ -10,9 +10,9 @@ import { EarningsCalculator } from "./earnings-calculator";
  */
 
 const STATS = [
-  { value: "0 ₽", label: "вложений от вас и клиента до результата" },
-  { value: "30 сек", label: "регистрация по коду агентства" },
-  { value: "~3 мес", label: "средний срок возврата через ФНС" },
+  { value: "0 ₽", label: "вложений от вас и клиента до результата" },
+  { value: "30 сек", label: "регистрация по коду агентства" },
+  { value: "~3 мес", label: "средний срок возврата через ФНС" },
 ];
 
 const PAINS = [
@@ -141,7 +141,7 @@ export default function MarketingPage() {
             {STATS.map((s) => (
               <div key={s.label} className="landing-card rounded-2xl px-5 py-6">
                 <div className="text-2xl font-bold text-emerald-gradient">{s.value}</div>
-                <div className="mt-1 text-xs text-white/50">{s.label}</div>
+                <div className="mt-1 text-xs text-white/60">{s.label}</div>
               </div>
             ))}
           </div>
@@ -239,7 +239,7 @@ export default function MarketingPage() {
                 "Прозрачный подсчёт вознаграждения",
               ].map((t) => (
                 <li key={t} className="flex items-start gap-2">
-                  <span className="text-emerald-gradient mt-0.5">✓</span>
+                  <span className="text-emerald-gradient mt-0.5" aria-hidden>✓</span>
                   {t}
                 </li>
               ))}
@@ -273,7 +273,7 @@ export default function MarketingPage() {
             <details key={f.q} className="landing-card group rounded-2xl p-5">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-medium marker:content-none">
                 {f.q}
-                <span className="text-white/40 transition group-open:rotate-45">+</span>
+                <span className="text-white/40 transition group-open:rotate-45" aria-hidden>+</span>
               </summary>
               <p className="mt-3 text-sm text-white/55">{f.a}</p>
             </details>

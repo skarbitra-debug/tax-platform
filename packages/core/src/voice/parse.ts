@@ -106,8 +106,11 @@ export function parseVoiceCommand(transcript: string, ctx: VoiceParseContext): V
       best = { code: st.code, score, matched };
     }
   }
-  // требуем, чтобы совпала хотя бы половина слов названия — иначе не уверены
-  const targetStatusCode = best && best.score >= 0.5 ? best.code : null;
+  // Требуем БОЛЬШЕ половины слов названия (не ровно половину): у двухсловных
+  // статусов должны совпасть ОБА слова. Иначе служебное слово фразы ложно
+  // включало бы статус: «по этому КЛИЕНТУ 12 такие-то обновления» (дословный
+  // сценарий ТЗ §4.7) при пороге 1/2 переводило бы сделку в «Клиент оплатил».
+  const targetStatusCode = best && best.score > 0.5 ? best.code : null;
 
   return { dealNumber, targetStatusCode };
 }

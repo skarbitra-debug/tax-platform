@@ -66,7 +66,14 @@ async function getPipeline(): Promise<TranscribeFn> {
   if (!pipelinePromise) {
     pipelinePromise = (async () => {
       // Динамический импорт: ESM-only пакет, грузим только когда STT реально нужен
-      const { pipeline } = await import("@xenova/transformers");
+      const { pipeline, env: hfEnv } = await import("@xenova/transformers");
+      // ВАЖНО: TRANSFORMERS_CACHE — конвенция python-версии; JS-библиотека
+      // переменные окружения НЕ читает, кэш задаётся через env.cacheDir.
+      // Без этого volume whisper_cache в проде оставался бы пустым и модель
+      // перекачивалась бы после каждого пересоздания контейнера.
+      if (process.env.TRANSFORMERS_CACHE) {
+        hfEnv.cacheDir = process.env.TRANSFORMERS_CACHE;
+      }
       const model = MODEL_MAP[env.WHISPER_MODEL] ?? MODEL_MAP.small!;
       console.log(`[stt] загружаю Whisper (${model})…`);
       const asr = await pipeline("automatic-speech-recognition", model);

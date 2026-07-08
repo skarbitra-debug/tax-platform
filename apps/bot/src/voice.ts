@@ -56,10 +56,17 @@ export async function handleVoice(ctx: Context): Promise<void> {
     // 2. Речь → текст (Whisper, локально)
     const transcript = await stt.transcribe(oggBytes);
 
-    // 3. Разбор ПРАВИЛАМИ по каталогу реальных сделок/статусов (без облака)
+    // 3. Разбор ПРАВИЛАМИ по каталогу реальных сделок/статусов (без облака).
+    // Вся произнесённая фраза идёт заметкой в историю статусов (§4.7
+    // «наговорил обновления»): Татьяна видит её в карточке сделки.
     const context = await buildVoiceContext();
     const parsed = parseVoiceCommand(transcript, context);
-    const intent = { transcript, dealNumber: parsed.dealNumber, targetStatusCode: parsed.targetStatusCode, note: null };
+    const intent = {
+      transcript,
+      dealNumber: parsed.dealNumber,
+      targetStatusCode: parsed.targetStatusCode,
+      note: transcript ? `Голос: «${transcript.slice(0, 300)}»` : null,
+    };
 
     // 4. Применить (со сквозным логом и трассировкой в истории статусов)
     const actor = await prisma.telegramAccount.findFirst({
