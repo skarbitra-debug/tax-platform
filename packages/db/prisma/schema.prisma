@@ -1,6 +1,10 @@
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/client"
+  // native — локальная разработка/Docker (движок под текущую ОС);
+  // rhel-openssl-3.0.x — AWS Lambda (Vercel): без него функция падает
+  // «could not locate the Query Engine for runtime rhel-openssl-3.0.x»
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

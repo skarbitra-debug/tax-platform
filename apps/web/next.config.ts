@@ -12,7 +12,9 @@ const nextConfig: NextConfig = {
   // packages/db/generated) должен доехать до серверных функций целиком,
   // включая нативный движок — явный include надёжнее эвристики трейсера
   outputFileTracingIncludes: {
-    "/**": ["../../packages/db/generated/client/**"],
+    // оба формата ключей — разные версии Next матчат по-разному
+    "/*": ["../../packages/db/generated/client/**"],
+    "/**/*": ["../../packages/db/generated/client/**"],
   },
   // пакеты @tax/* не собираются (exports -> ./src/index.ts), транспилирует web
   transpilePackages: ["@tax/config", "@tax/core", "@tax/crypto", "@tax/db"],

@@ -24,6 +24,7 @@
   "devDependencies": {
     "@playwright/test": "^1",
     "prettier": "^3.4.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "next": "^15.1.6"
   }
 }

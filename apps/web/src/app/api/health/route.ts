@@ -8,7 +8,10 @@ export async function GET() {
     // SELECT 1 — самый дешёвый способ убедиться, что коннект к Postgres жив
     await prisma.$queryRaw`SELECT 1`;
     return Response.json({ ok: true, db: true });
-  } catch {
+  } catch (e) {
+    // Причина — в серверный лог (обезличенно, это инфраструктурная ошибка,
+    // не ПД); без этого диагностика «db:false» на serverless слепая
+    console.error("[health] БД недоступна:", e instanceof Error ? e.message : e);
     return Response.json({ ok: false, db: false }, { status: 503 });
   }
 }
