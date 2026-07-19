@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { prisma } from "@tax/db";
 import { createMyReferralLink } from "@/actions/referral.actions";
+import { formatRub } from "@/lib/format";
 import { env } from "@/lib/env";
 import { requireRole } from "@/lib/require-role";
+import { BelowThresholdBadge, StatusBadge, formatDate } from "./_lib/ui";
 import { ReferralLinkActions } from "./referral-link-actions";
 
 export const metadata = { title: "Кабинет партнёра" };
@@ -23,7 +25,7 @@ export default async function CabinetPage() {
   }
 
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const [activeLink, totalCount, newCount, weekCount] = await Promise.all([
+  const [activeLink, totalCount, newCount, weekCount, recentDeals] = await Promise.all([
     // Чтение напрямую (мутации — только через @tax/core в actions)
     prisma.referralLink.findFirst({
       where: { realtorId, isActive: true },
@@ -33,6 +35,22 @@ export default async function CabinetPage() {
     // Новые — по стабильному code (контракт §1: label админ правит свободно)
     prisma.deal.count({ where: { realtorId, status: { code: "NEW" } } }),
     prisma.deal.count({ where: { realtorId, createdAt: { gte: weekAgo } } }),
+    // Лента последних заявок прямо на дашборде (просьба заказчика):
+    // изоляция та же — только свои, покрыто индексом [realtorId, createdAt desc]
+    prisma.deal.findMany({
+      where: { realtorId },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      select: {
+        id: true,
+        number: true,
+        createdAt: true,
+        belowThreshold: true,
+        taxPaidAmount: true,
+        client: { select: { firstName: true, phone: true } },
+        status: { select: { label: true, color: true } },
+      },
+    }),
   ]);
 
   // База реф-ссылок — APP_URL из @tax/config (§5); хвостовой слэш срезаем
@@ -102,6 +120,92 @@ export default async function CabinetPage() {
             </div>
           ))}
         </div>
+
+        {/* Лента последних заявок прямо на дашборде (до 8; полный список — /cabinet/deals) */}
+        {recentDeals.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-600">
+            Заявок пока нет — отправьте свою ссылку клиенту, и они появятся здесь.
+          </div>
+        ) : (
+          <>
+            {/* Мобильные карточки (< sm) */}
+            <ul className="space-y-3 sm:hidden">
+              {recentDeals.map((deal) => (
+                <li key={deal.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm text-slate-500">
+                      № {deal.number} · {formatDate(deal.createdAt)}
+                    </p>
+                    <StatusBadge status={deal.status} />
+                  </div>
+                  <p className="mt-2 font-semibold">{deal.client.firstName}</p>
+                  <a href={`tel:${deal.client.phone}`} className="text-sm text-blue-600">
+                    {deal.client.phone}
+                  </a>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <p className="text-sm text-slate-600">
+                      Налог:{" "}
+                      <span className="font-semibold text-slate-900">
+                        {formatRub(deal.taxPaidAmount)}
+                      </span>
+                    </p>
+                    {deal.belowThreshold && <BelowThresholdBadge />}
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            {/* Десктопная таблица (>= sm) */}
+            <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white sm:block">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-slate-200 text-xs uppercase text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">№</th>
+                    <th className="px-4 py-3 font-semibold">Клиент</th>
+                    <th className="px-4 py-3 font-semibold">Телефон</th>
+                    <th className="px-4 py-3 font-semibold">Налог</th>
+                    <th className="px-4 py-3 font-semibold">Дата</th>
+                    <th className="px-4 py-3 font-semibold">Статус</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {recentDeals.map((deal) => (
+                    <tr key={deal.id}>
+                      <td className="px-4 py-3 text-slate-500">{deal.number}</td>
+                      <td className="px-4 py-3 font-medium">{deal.client.firstName}</td>
+                      <td className="px-4 py-3">
+                        <a href={`tel:${deal.client.phone}`} className="text-blue-600 hover:underline">
+                          {deal.client.phone}
+                        </a>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 font-semibold">
+                        {formatRub(deal.taxPaidAmount)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">
+                        {formatDate(deal.createdAt)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <StatusBadge status={deal.status} />
+                          {deal.belowThreshold && <BelowThresholdBadge />}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {totalCount > recentDeals.length && (
+              <p className="text-center text-sm text-slate-500">
+                Показаны последние {recentDeals.length} из {totalCount} —{" "}
+                <Link href="/cabinet/deals" className="font-medium text-blue-600 hover:text-blue-700">
+                  открыть все
+                </Link>
+              </p>
+            )}
+          </>
+        )}
       </section>
     </div>
   );

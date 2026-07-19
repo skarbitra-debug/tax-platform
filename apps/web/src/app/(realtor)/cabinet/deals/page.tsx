@@ -2,52 +2,14 @@ import Link from "next/link";
 import { prisma } from "@tax/db";
 import { formatRub } from "@/lib/format";
 import { requireRole } from "@/lib/require-role";
+import { BelowThresholdBadge, StatusBadge, formatDate } from "../_lib/ui";
 
 export const metadata = { title: "Мои заявки" };
 // Список ходит в prisma — рендер только на запрос, без пререндера в build
 export const dynamic = "force-dynamic";
 
-/** Дата по МСК: аудитория в РФ, сервер — зарубежный VPS в UTC (план §5) */
-function formatDate(d: Date): string {
-  return d.toLocaleDateString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "Europe/Moscow",
-  });
-}
 
-/**
- * Статус-бейдж: label + color из DealStatus (админ настраивает, §6 ТЗ).
- * color — hex вида #16a34a; заливка — он же с ~12% альфы (суффикс "1f").
- * color не задан (seed его не заполняет) → нейтральный серый.
- */
-function StatusBadge({ status }: { status: { label: string; color: string | null } }) {
-  if (!status.color) {
-    return (
-      <span className="inline-block rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
-        {status.label}
-      </span>
-    );
-  }
-  return (
-    <span
-      className="inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold"
-      style={{ color: status.color, backgroundColor: `${status.color}1f` }}
-    >
-      {status.label}
-    </span>
-  );
-}
 
-/** Пометка «ниже порога» (§1: анкета не отсекает — решение за Татьяной) */
-function BelowThresholdBadge() {
-  return (
-    <span className="inline-block rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
-      Ниже порога
-    </span>
-  );
-}
 
 /**
  * [M1-6] Заявки риэлтора: карточки на мобильном, таблица на десктопе.
