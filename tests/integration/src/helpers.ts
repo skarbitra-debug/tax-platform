@@ -75,11 +75,9 @@ export function leadInput(token: string, over: Partial<LeadFormInput> = {}): Lea
     submissionId: crypto.randomUUID(),
     firstName: "Тест",
     phone: uniquePhone(),
-    telegram: undefined,
     salePriceRub: 5_000_000,
     taxPaidRub: 400_000,
-    consentNoUnderstatement: true,
-    consentPaymentTerms: true,
+    consentPersonalData: true,
     ...over,
   };
 }

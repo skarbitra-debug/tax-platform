@@ -1,6 +1,6 @@
 /**
  * Тесты leadFormSchema (M1-1): валидный кейс, галки literal(true), налог ≥ суммы,
- * границы сумм, нормализация телефона, telegram с "@" и пустой, формат токена.
+ * границы сумм, нормализация телефона, галочка ПДн, формат токена.
  * Чистая Zod-схема — БД не нужна.
  */
 import { describe, expect, it } from "vitest";
@@ -12,11 +12,10 @@ const valid = {
   submissionId: "0f1e2d3c-4b5a-4678-9abc-def012345678",
   firstName: "Анна",
   phone: "8 (926) 123-45-67",
-  telegram: "@my_username",
+
   salePriceRub: "5000000",
   taxPaidRub: "300000",
-  consentNoUnderstatement: true,
-  consentPaymentTerms: true,
+  consentPersonalData: true,
 };
 
 /** Пути полей, на которых схема выдала ошибки */
@@ -27,15 +26,14 @@ function errorPaths(input: Record<string, unknown>): string[] {
 }
 
 describe("leadFormSchema — валидный кейс", () => {
-  it("парсится; телефон нормализован, telegram без @, суммы — числа", () => {
+  it("парсится; телефон нормализован, суммы — числа", () => {
     const result = leadFormSchema.safeParse(valid);
     expect(result.success).toBe(true);
     if (!result.success) return;
     expect(result.data.phone).toBe("+79261234567");
-    expect(result.data.telegram).toBe("my_username");
     expect(result.data.salePriceRub).toBe(5_000_000);
     expect(result.data.taxPaidRub).toBe(300_000);
-    expect(result.data.consentNoUnderstatement).toBe(true);
+    expect(result.data.consentPersonalData).toBe(true);
     expect(result.data.firstName).toBe("Анна");
   });
 
@@ -49,11 +47,9 @@ describe("leadFormSchema — валидный кейс", () => {
 
 describe("галки согласий — literal(true), сервер не верит скрытым полям", () => {
   it.each([
-    ["consentNoUnderstatement", false],
-    ["consentNoUnderstatement", undefined],
-    ["consentNoUnderstatement", "on"], // сырое значение чекбокса — не true
-    ["consentPaymentTerms", false],
-    ["consentPaymentTerms", undefined],
+    ["consentPersonalData", false],
+    ["consentPersonalData", undefined],
+    ["consentPersonalData", "on"], // сырое значение чекбокса — не true
   ])("%s = %s → ошибка на этом поле", (field, value) => {
     expect(errorPaths({ ...valid, [field]: value })).toContain(field);
   });
@@ -120,39 +116,6 @@ describe("телефон нормализуется схемой", () => {
     ["", "пусто"],
   ])("%s → ошибка на phone (%s)", (phone) => {
     expect(errorPaths({ ...valid, phone })).toContain("phone");
-  });
-});
-
-describe("telegram — опциональный, ведущий @ срезается", () => {
-  it("с @ → без @", () => {
-    const result = leadFormSchema.safeParse({ ...valid, telegram: "@name_123" });
-    expect(result.success).toBe(true);
-    if (!result.success) return;
-    expect(result.data.telegram).toBe("name_123");
-  });
-
-  it("пустая строка → undefined (поле не заполнено)", () => {
-    const result = leadFormSchema.safeParse({ ...valid, telegram: "" });
-    expect(result.success).toBe(true);
-    if (!result.success) return;
-    expect(result.data.telegram).toBeUndefined();
-  });
-
-  it("отсутствует вовсе → undefined", () => {
-    const { telegram: _omit, ...rest } = valid;
-    const result = leadFormSchema.safeParse(rest);
-    expect(result.success).toBe(true);
-    if (!result.success) return;
-    expect(result.data.telegram).toBeUndefined();
-  });
-
-  it.each([
-    ["@abc", "короче 5 символов"],
-    ["имя_кириллицей", "кириллица"],
-    ["name with spaces", "пробелы"],
-    ["a".repeat(33), "длиннее 32"],
-  ])("%s → ошибка на telegram (%s)", (telegram) => {
-    expect(errorPaths({ ...valid, telegram })).toContain("telegram");
   });
 });
 

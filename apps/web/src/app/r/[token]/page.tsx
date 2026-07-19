@@ -15,7 +15,6 @@ export const metadata = { title: "Возврат налога" };
 export const dynamic = "force-dynamic";
 
 const fmtRub = new Intl.NumberFormat("ru-RU");
-const fmtPct = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 });
 
 /** Общая обёртка экранов-состояний (недействительна/устарела) — без формы */
 function StateScreen({ title, children }: { title: string; children: ReactNode }) {
@@ -100,10 +99,10 @@ export default async function ClientReferralPage({
     return <InactiveLinkScreen />;
   }
 
-  // Ставка и порог — из активного CommissionConfig (контракт §1: НЕ хардкод).
-  // Ставку клиент ВИДИТ здесь; её снапшот в Deal.consentRatePct пишет createLead
-  const { clientRatePct, minTaxThreshold } = await getActiveCommissionConfig();
-  const ratePctLabel = fmtPct.format(clientRatePct);
+  // Порог — из активного CommissionConfig (для неблокирующего hint в анкете).
+  // Ставка клиенту больше не показывается (решение заказчика 19.07);
+  // её снапшот в Deal.consentRatePct продолжает писать createLead
+  const { minTaxThreshold } = await getActiveCommissionConfig();
   const thresholdLabel = minTaxThreshold !== null ? fmtRub.format(minTaxThreshold) : null;
 
   // Объяснялка передаётся В клиентский компонент: после успешной отправки
@@ -126,7 +125,7 @@ export default async function ClientReferralPage({
       <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-base font-semibold">Как это работает</h2>
         <ol className="mt-4 space-y-4">
-          <Step n={1} title="Заполняете анкету" text="Пара минут прямо на этой странице." />
+          <Step n={1} title="Заполняете анкету" text="Пара минут — на следующем шаге." />
           <Step n={2} title="Подписываете договор" text="Пришлём после проверки анкеты." />
           <Step
             n={3}
@@ -142,32 +141,15 @@ export default async function ClientReferralPage({
         </ol>
       </section>
 
-      <section className="mt-4 rounded-2xl bg-blue-50 p-5">
-        <p className="text-base leading-relaxed text-blue-900">
-          Вы платите <span className="font-bold">{ratePctLabel}%</span> от фактически
-          возвращённого налога — и только после того, как деньги поступят на ваш счёт.
-        </p>
-      </section>
-
-      <a
-        href="#lead-form"
-        className="mt-5 block w-full rounded-xl bg-blue-600 px-4 py-3.5 text-center text-base font-semibold text-white transition hover:bg-blue-700"
-      >
-        Оставить заявку
-      </a>
     </>
   );
 
   return (
     <main className="mx-auto w-full max-w-md px-4 py-8">
-      {/* Плавный скролл для якоря-CTA; страница одна — глобальный css не трогаем */}
-      <style>{`html { scroll-behavior: smooth; }`}</style>
-
       {/* Анкета — та же страница; intro и форма живут внутри LeadForm,
           чтобы успех заменял всё разом (секция #lead-form — внутри) */}
       <LeadForm
         token={token}
-        ratePctLabel={ratePctLabel}
         thresholdRub={minTaxThreshold}
         thresholdLabel={thresholdLabel}
         intro={intro}

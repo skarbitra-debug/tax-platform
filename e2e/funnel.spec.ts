@@ -12,7 +12,7 @@ import { test, expect, type Page } from "@playwright/test";
  *   copyLinkBtn — кнопка «Копировать» рядом со ссылкой
  *   quizForm    — <form> анкеты на /r/[token]; поля с name= из leadFormSchema
  *                 (firstName, phone, salePriceRub, taxPaidRub + чекбоксы
- *                 consentNoUnderstatement, consentPaymentTerms — реальные
+ *                 consentPersonalData (согласие ПДн 152-ФЗ) — реальный
  *                 <input type="checkbox">, кликабельные)
  *   quizSubmit  — кнопка отправки анкеты
  *   quizSuccess — блок «Заявка принята» после сабмита
@@ -74,6 +74,10 @@ test.describe("Воронка: ссылка → анкета → заявка (M
       const clientPage = await clientContext.newPage();
       await clientPage.goto(`/r/${token}`);
 
+      // Двухшаговый флоу (19.07): сначала объяснялка с кнопкой
+      // «Просчитать возврат» — анкета открывается вторым шагом
+      await clientPage.getByTestId("startQuizBtn").click();
+
       const quizForm = clientPage.getByTestId("quizForm");
       await expect(quizForm).toBeVisible();
 
@@ -83,8 +87,8 @@ test.describe("Воронка: ссылка → анкета → заявка (M
       // должно принимать «сырые» цифры (inputmode=numeric, план §4)
       await quizForm.locator('input[name="salePriceRub"]').fill("5000000");
       await quizForm.locator('input[name="taxPaidRub"]').fill("400000");
-      await quizForm.locator('input[name="consentNoUnderstatement"]').check();
-      await quizForm.locator('input[name="consentPaymentTerms"]').check();
+      // Единственная галочка: согласие на обработку ПДн (152-ФЗ)
+      await quizForm.locator('input[name="consentPersonalData"]').check();
 
       await clientPage.getByTestId("quizSubmit").click();
       await expect(clientPage.getByTestId("quizSuccess")).toBeVisible();

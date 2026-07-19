@@ -174,9 +174,13 @@ model Deal {
   submissionId            String   @unique // идемпотентность двойного тапа
   saleAmount              Decimal  @db.Decimal(14, 2)
   taxPaidAmount           Decimal  @db.Decimal(14, 2)
-  consentNoUnderstatement Boolean
-  consentPaymentTerms     Boolean
-  consentRatePct          Decimal  @db.Decimal(5, 2) // снапшот ставки, которую клиент ВИДЕЛ (юр. след §4.8)
+  // Согласие на обработку ПДн (152-ФЗ) — единственная галочка анкеты
+  // (решение заказчика 19.07: галочки «нет занижений» и «готов платить 20%»
+  // убраны из формы; исторические поля ниже — nullable, для старых заявок)
+  consentPersonalData     Boolean  @default(false)
+  consentNoUnderstatement Boolean?
+  consentPaymentTerms     Boolean?
+  consentRatePct          Decimal  @db.Decimal(5, 2) // снапшот ставки конфига на момент заявки (внутренний учёт)
   consentAt               DateTime @default(now())
   consentIp               String?
   consentUserAgent        String?

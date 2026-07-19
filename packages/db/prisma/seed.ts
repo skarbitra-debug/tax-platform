@@ -212,8 +212,7 @@ async function seedDev(): Promise<void> {
           submissionId: d.submissionId,
           saleAmount: d.saleAmount,
           taxPaidAmount: d.taxPaidAmount,
-          consentNoUnderstatement: true,
-          consentPaymentTerms: true,
+          consentPersonalData: true,
           consentRatePct: "20.00", // снапшот ставки, которую клиент видел
           belowThreshold: d.belowThreshold,
           thresholdAtSubmission: "250000.00",

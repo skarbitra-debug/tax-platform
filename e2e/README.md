@@ -57,7 +57,8 @@ E2E_BASE_URL=http://localhost:3000 npx playwright test
 |---|---|---|
 | `refLinkUrl` | `/cabinet` | элемент с **полным URL** реф-ссылки текстом |
 | `copyLinkBtn` | `/cabinet` | кнопка «Копировать» рядом со ссылкой |
-| `quizForm` | `/r/[token]` | `<form>` анкеты; поля `name=` из `leadFormSchema`: `firstName`, `phone`, `salePriceRub`, `taxPaidRub`, чекбоксы `consentNoUnderstatement`, `consentPaymentTerms` (реальные кликабельные `<input type="checkbox">`) |
+| `startQuizBtn` | `/r/[token]` | кнопка «Просчитать возврат» — открывает шаг анкеты |
+| `quizForm` | `/r/[token]` (шаг 2) | `<form>` анкеты; поля `name=` из `leadFormSchema`: `firstName`, `phone`, `salePriceRub`, `taxPaidRub`, чекбокс `consentPersonalData` — согласие ПДн 152-ФЗ (реальный кликабельный `<input type="checkbox">`) |
 | `quizSubmit` | `/r/[token]` | кнопка отправки анкеты |
 | `quizSuccess` | `/r/[token]` | блок «Заявка принята» после сабмита |
 | `dealRow` | `/cabinet/deals` | строка/карточка заявки; содержит имя клиента и label статуса («Новая заявка») |

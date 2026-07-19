@@ -48,11 +48,9 @@ export async function submitApplication(
     submissionId: String(formData.get("submissionId") ?? ""),
     firstName: String(formData.get("firstName") ?? ""),
     phone: String(formData.get("phone") ?? ""),
-    telegram: String(formData.get("telegram") ?? ""), // "" → undefined делает схема
     salePriceRub: digitsOnly(formData.get("salePriceRub")),
     taxPaidRub: digitsOnly(formData.get("taxPaidRub")),
-    consentNoUnderstatement: formData.get("consentNoUnderstatement") === "on",
-    consentPaymentTerms: formData.get("consentPaymentTerms") === "on",
+    consentPersonalData: formData.get("consentPersonalData") === "on",
   });
 
   if (!parsed.success) {

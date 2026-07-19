@@ -6,7 +6,7 @@ import { REFERRAL_TOKEN_REGEX } from "./token";
  * ЕДИНСТВЕННАЯ Zod-схема анкеты клиента (контракт §1: канон — зона funnel,
  * схема живёт здесь, web её импортирует). Сервер НЕ доверяет скрытым полям
  * формы: token/submissionId валидируются по формату, суммы — по границам,
- * галки — literal(true). Все сообщения — русские, они уходят клиенту в UI.
+ * галочка ПДн — literal(true). Все сообщения — русские, они уходят клиенту в UI.
  *
  * Границы сумм (§4 плана): сделка 100 000 ₽ … 2 млрд ₽ — отсекают опечатки
  * («лишний ноль») и мусор; налог ≥ 1 ₽ и строго меньше суммы сделки (refine).
@@ -33,20 +33,6 @@ export const leadFormSchema = z
         z.string().regex(/^\+7\d{10}$/, "Укажите российский номер: +7 XXX XXX-XX-XX."),
       ),
 
-    // Опционален (§8 вопрос 1): "@name" → "name", пустая строка → undefined
-    telegram: z
-      .string()
-      .trim()
-      .transform((v) => v.replace(/^@/, ""))
-      .transform((v) => (v === "" ? undefined : v))
-      .pipe(
-        z
-          .string()
-          .regex(/^[a-zA-Z0-9_]{5,32}$/, "Ник в Telegram: 5–32 символа, латиница/цифры/подчёркивание.")
-          .optional(),
-      )
-      .optional(),
-
     // coerce: из формы приходят строки; int — целые рубли (копейки в анкете не нужны)
     salePriceRub: z.coerce
       .number({ invalid_type_error: "Укажите сумму продажи числом." })
@@ -60,12 +46,10 @@ export const leadFormSchema = z
       .min(1, "Сумма налога должна быть больше нуля.")
       .max(2_000_000_000, "Сумма налога — не более 2 000 000 000 ₽."),
 
-    // Галки дословно из §4.4 ТЗ — юридический след; без них заявка не существует
-    consentNoUnderstatement: z.literal(true, {
-      errorMap: () => ({ message: "Без этого подтверждения отправить заявку нельзя." }),
-    }),
-    consentPaymentTerms: z.literal(true, {
-      errorMap: () => ({ message: "Без согласия с условиями оплаты отправить заявку нельзя." }),
+    // Единственная галочка (решение заказчика 19.07): согласие на обработку
+    // персональных данных (152-ФЗ) — без него заявку принимать нельзя
+    consentPersonalData: z.literal(true, {
+      errorMap: () => ({ message: "Без согласия на обработку персональных данных отправить заявку нельзя." }),
     }),
   })
   .refine((data) => data.taxPaidRub < data.salePriceRub, {
@@ -73,5 +57,5 @@ export const leadFormSchema = z
     path: ["taxPaidRub"],
   });
 
-/** Выходной тип схемы: phone уже нормализован, telegram без "@", суммы — числа */
+/** Выходной тип схемы: phone уже нормализован, суммы — числа */
 export type LeadFormInput = z.infer<typeof leadFormSchema>;

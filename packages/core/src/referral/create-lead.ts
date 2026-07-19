@@ -21,9 +21,9 @@ export type CreateLeadResult =
  *  3. открытая сделка (status.isTerminal=false) с тем же телефоном →
  *     duplicateOfDealId — бейдж «возможный дубль» у админа, НЕ блокируем
  *     (две квартиры = две легитимные сделки);
- *  4. Deal.create: суммы в рублях → Decimal(14,2), согласия + снапшоты из
- *     АКТИВНОГО конфига (consentRatePct — ставка, которую клиент ВИДЕЛ,
- *     юр. след §4.8; belowThreshold + thresholdAtSubmission — §8 вопрос 2),
+ *  4. Deal.create: суммы в рублях → Decimal(14,2), согласие ПДн (152-ФЗ,
+ *     единственная галочка анкеты) + снапшоты из АКТИВНОГО конфига
+ *     (consentRatePct — внутренний учёт; belowThreshold — §8 вопрос 2),
  *     статус по isInitial=true (контракт §1: не хардкод code);
  *  5. DealStatusHistory {from: null, to: initial, AUTO, SYSTEM}.
  *
@@ -57,15 +57,12 @@ export async function createLead(
         create: {
           firstName: input.firstName,
           phone: input.phone,
-          telegramUsername: input.telegram ?? null,
         },
         update: {}, // существующего здесь не трогаем — дозаполним ниже
       });
-      // Дозаполняем ТОЛЬКО пустые поля (firstName пуст после обезличивания 152-ФЗ,
-      // telegram мог не указываться в прошлый раз). Непустые не перетираем.
-      const fill: { firstName?: string; telegramUsername?: string } = {};
+      // Дозаполняем ТОЛЬКО пустое имя (пустым бывает после обезличивания 152-ФЗ).
+      const fill: { firstName?: string } = {};
       if (!client.firstName) fill.firstName = input.firstName;
-      if (!client.telegramUsername && input.telegram) fill.telegramUsername = input.telegram;
       if (Object.keys(fill).length > 0) {
         client = await tx.client.update({ where: { id: client.id }, data: fill });
       }
@@ -109,9 +106,8 @@ export async function createLead(
           submissionId: input.submissionId,
           saleAmount: input.salePriceRub,
           taxPaidAmount: input.taxPaidRub,
-          consentNoUnderstatement: input.consentNoUnderstatement,
-          consentPaymentTerms: input.consentPaymentTerms,
-          consentRatePct: cfg.clientRatePct, // Decimal как есть — без float-конверсий
+          consentPersonalData: input.consentPersonalData,
+          consentRatePct: cfg.clientRatePct, // снапшот ставки конфига (внутренний учёт)
           consentIp: meta.ip ?? null,
           consentUserAgent: meta.userAgent ?? null,
           belowThreshold,
