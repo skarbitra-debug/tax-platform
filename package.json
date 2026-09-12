@@ -10,7 +10,7 @@
     "dev:web": "pnpm --filter @tax/web dev",
     "dev:bot": "pnpm --filter @tax/bot dev",
     "build": "pnpm db:generate && pnpm -r build",
-    "lint": "pnpm -r --if-present lint",
+    "lint": "pnpm lint:check",
     "typecheck": "pnpm db:generate && pnpm -r typecheck",
     "test": "pnpm -r --if-present --filter \"!@tax/integration-tests\" test",
     "test:integration": "pnpm --filter @tax/integration-tests test",
@@ -19,12 +19,17 @@
     "db:deploy": "pnpm --filter @tax/db exec prisma migrate deploy",
     "db:studio": "pnpm --filter @tax/db exec prisma studio",
     "db:seed": "pnpm --filter @tax/db seed",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "lint:check": "eslint . --max-warnings 0"
   },
   "devDependencies": {
     "@playwright/test": "^1",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2",
-    "next": "15.5.24"
+    "next": "15.5.24",
+    "eslint": "9.39.5",
+    "@eslint/js": "9.39.5",
+    "typescript-eslint": "8.70.0",
+    "globals": "16.5.0"
   }
 }

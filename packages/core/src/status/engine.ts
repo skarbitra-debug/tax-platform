@@ -90,6 +90,6 @@ export async function changeDealStatusByCode(
     select: { id: true },
   });
   if (!status) return { ok: false, reason: "STATUS_NOT_FOUND" };
-  const { toStatusCode, ...rest } = args;
+  const { toStatusCode: _toStatusCode, ...rest } = args;
   return changeDealStatus({ ...rest, toStatusId: status.id });
 }
