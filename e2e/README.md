@@ -52,6 +52,6 @@ unset E2E_WEBSERVER
 pnpm e2e e2e/funnel.spec.ts e2e/session-containment.spec.ts e2e/auth-credentials.spec.ts
 ```
 
-После проверки остановите только свои web/DB процессы. Не запускайте bot. Session API сам по себе не перечитывает статус пользователя из БД: drift проверяется защищённым запросом, который вызывает guard → session cleanup → login. Secure cookie cleanup проверяется raw HTTP Cookie/Set-Cookie, независимо от хранения Secure cookie браузером на loopback.
+После проверки остановите только свои web/DB процессы. Не запускайте bot. Session API сам по себе не перечитывает статус пользователя из БД: drift проверяется защищённым запросом, который вызывает guard → session cleanup → login. Secure cookie cleanup проверяется raw HTTP Cookie/Set-Cookie и реальным Chromium через отдельный loopback HTTPS replay неизменённых заголовков production route. Replay создаёт временный self-signed сертификат через установленный `openssl`, затем закрывает TLS listener и удаляет временную папку в finally. Это тестовая инфраструктура, без нового application endpoint.
 
 CI сохраняет отдельный integration/seed этап, затем создаёт новую auth E2E DB и применяет существующие миграции без seed. E2E step переключает DATABASE_URL и включает explicit synthetic opt-in. Existing CI launcher использует dev server; локальный release regression необходимо выполнять на `next start` после build. Ни локальный PASS, ни CI не являются проверкой live containment или разрешением deployment.

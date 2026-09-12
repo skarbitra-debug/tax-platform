@@ -19,7 +19,9 @@ export async function GET(request: Request): Promise<NextResponse> {
   // Exact cookie names only: any numeric chunk, no lookalike/CSRF cookies.
   for (const { name } of store.getAll()) {
     if (/^(?:__Secure-)?authjs\.session-token(?:\.\d+)?$/.test(name)) {
-      store.delete(name);
+      // Browsers reject __Secure- Set-Cookie headers without Secure, including
+      // expirations. Name-only delete() loses that attribute and leaves chunks.
+      store.set(name, "", { expires: new Date(0), path: "/", secure: name.startsWith("__Secure-") });
     }
   }
 
