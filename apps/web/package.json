@@ -15,7 +15,7 @@
     "@tax/core": "workspace:*",
     "@tax/crypto": "workspace:*",
     "@tax/db": "workspace:*",
-    "next": "^15.1.6",
+    "next": "15.5.24",
     "next-auth": "5.0.0-beta.25",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
