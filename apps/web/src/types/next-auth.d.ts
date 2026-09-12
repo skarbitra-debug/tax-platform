@@ -14,6 +14,7 @@ declare module "next-auth" {
   interface Session {
     user: {
       id: string;
+      sessionGeneration?: number;
       role: AppRole;
       /** RealtorProfile.id; у ADMIN — null. Выборки ЛК фильтруют по нему */
       realtorId: string | null;
@@ -30,6 +31,7 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
   interface JWT {
     id: string;
+    sessionGeneration?: number;
     role: AppRole;
     realtorId: string | null;
   }
