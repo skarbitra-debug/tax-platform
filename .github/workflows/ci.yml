@@ -1,7 +1,6 @@
 # ============================================================
-# CI (план M0-12): install frozen → prisma validate → generate →
-# lint → typecheck → unit-тесты чистых пакетов (config/crypto/core).
-# БД в CI НЕ поднимается — тесты только чистых функций.
+# CI: checks — frozen install, Prisma, lint, typecheck, all unit tests, build.
+# Отдельный db-tests — PostgreSQL, migrations/seed, integration и E2E.
 # ============================================================
 name: CI
 
@@ -51,8 +50,18 @@ jobs:
         run: pnpm typecheck
 
       # vitest сам определяет CI и выполняет одиночный прогон (не watch)
-      - name: Unit tests (config, crypto, core — без БД)
-        run: pnpm -r --if-present --filter @tax/config --filter @tax/crypto --filter @tax/core test
+      - name: Unit tests (all packages except DB integration)
+        run: pnpm test
+
+      - name: Production build
+        run: pnpm build
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci_build
+          AUTH_SECRET: ci-build-only-not-a-real-secret-000000000000
+          APP_URL: http://127.0.0.1:3000
+          AUTH_TRUST_HOST: "true"
+          PILOT_NOINDEX: "1"
+          NEXT_TELEMETRY_DISABLED: "1"
 
   # ---- Тесты с БД: интеграционные (@tax/core против Postgres) + e2e воронки ----
   db-tests:
@@ -74,6 +83,8 @@ jobs:
       ADMIN_EMAIL: admin@example.com
       ADMIN_INITIAL_PASSWORD: ci-admin-pass
       AUTH_SECRET: ci-secret-at-least-32-characters-long!!
+      E2E_SYNTHETIC_AUTH_SECRET: ci-secret-at-least-32-characters-long!!
+      AUTH_TRUST_HOST: "true"
       APP_URL: http://localhost:3000
       PILOT_NOINDEX: "1"
       SEED_DEV: "1"
@@ -92,10 +103,22 @@ jobs:
         run: pnpm db:deploy && pnpm db:seed
       - name: Integration tests (@tax/core против БД)
         run: pnpm --filter @tax/integration-tests test
+      - name: Create isolated auth E2E database (no seed)
+        run: psql -h localhost -U tax -d postgres -c 'CREATE DATABASE tax_b02a4_auth_e2e'
+        env:
+          PGPASSWORD: tax
+      - name: Apply existing migrations to auth E2E database
+        run: pnpm db:deploy
+        env:
+          DATABASE_URL: postgresql://tax:tax@localhost:5432/tax_b02a4_auth_e2e
       - name: Install Playwright chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: E2E воронки (Playwright поднимает web сам)
         run: pnpm e2e
+        env:
+          DATABASE_URL: postgresql://tax:tax@localhost:5432/tax_b02a4_auth_e2e
+          E2E_SYNTHETIC_DB: "1"
+          SEED_DEV: "0"
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4

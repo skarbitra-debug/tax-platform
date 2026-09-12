@@ -5,7 +5,6 @@ import { z } from "zod";
 import { changeDealStatus, changeDealStatusByCode, recalcDealCommission } from "@tax/core";
 import { Prisma, prisma } from "@tax/db";
 import { requireRole } from "@/lib/require-role";
-import { sendHandoffToChannel } from "@/lib/telegram";
 
 /** Состояние форм карточки сделки (useActionState) */
 export type DealActionState = { ok?: boolean; error?: string };
@@ -163,28 +162,12 @@ export async function markContractSentAction(
   return { ok: true };
 }
 
-/**
- * Повторная отправка заявки в noname-канал (§4.5): для сделок, у которых
- * хендофф не прошёл (handoffSentAt=null — Telegram лежал или не был настроен).
- */
+/** Legacy channel resend is disabled even for an existing ADMIN session. */
 export async function resendHandoffAction(
   _prev: DealActionState,
-  formData: FormData,
+  _formData: FormData,
 ): Promise<DealActionState> {
-  await requireRole("ADMIN");
-  const dealId = String(formData.get("dealId") ?? "");
-  if (!dealId) return { error: "Сделка не указана." };
-
-  const sent = await sendHandoffToChannel(dealId);
-  revalidatePath(`/admin/deals/${dealId}`);
-  if (!sent) {
-    return {
-      error:
-        "Не удалось отправить в канал: проверьте TELEGRAM_BOT_TOKEN/TELEGRAM_CHANNEL_ID " +
-        "и доступность Telegram.",
-    };
-  }
-  return { ok: true };
+  return { error: "Передача заявок в канал отключена." };
 }
 
 /** Отметить «договор подписан» (§4.8) — симметрично отправке, только дата */

@@ -67,8 +67,8 @@ export function EarningsCalculator() {
               className="mt-3 w-full accent-[var(--accent)]"
             />
             <div className="mt-1 flex justify-between text-xs text-white/45">
-              <span>100 тыс</span>
-              <span>1 млн</span>
+              <span>{"100\u00a0тыс"}</span>
+              <span>{"1\u00a0млн"}</span>
             </div>
           </div>
 

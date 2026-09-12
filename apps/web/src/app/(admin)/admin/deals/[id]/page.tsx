@@ -4,18 +4,15 @@ import { listActiveStatuses } from "@tax/core";
 import { prisma } from "@tax/db";
 import { formatRub } from "@/lib/format";
 import { requireRole } from "@/lib/require-role";
-import { hasFnsCredential, isFnsStorageConfigured } from "@/lib/fns";
 import { FlagBadge, StatusBadge, formatDateTime } from "../../_lib/ui";
 import {
   ClientPaidForm,
   ContractForm,
-  HandoffBlock,
   PayoutForm,
   ReassignForm,
   RefundForm,
   StatusChangeForm,
 } from "./deal-forms";
-import { FnsSection } from "./fns-section";
 
 export const metadata = { title: "Сделка — админ-панель" };
 export const dynamic = "force-dynamic";
@@ -70,15 +67,13 @@ export default async function AdminDealPage({ params }: { params: Promise<{ id: 
   });
   if (!deal) notFound();
 
-  const [statuses, realtors, fnsStored] = await Promise.all([
+  const [statuses, realtors] = await Promise.all([
     listActiveStatuses(),
     prisma.realtorProfile.findMany({
       select: { id: true, user: { select: { name: true, email: true } } },
       orderBy: { createdAt: "desc" },
     }),
-    hasFnsCredential(deal.clientId),
   ]);
-  const fnsConfigured = isFnsStorageConfigured();
 
   const c = deal.commission;
 
@@ -131,13 +126,6 @@ export default async function AdminDealPage({ params }: { params: Promise<{ id: 
         </Card>
       </div>
 
-      <Card title="Передача исполнителям (§4.5)">
-        <HandoffBlock
-          dealId={deal.id}
-          handoffSentAt={deal.handoffSentAt ? formatDateTime(deal.handoffSentAt) : null}
-        />
-      </Card>
-
       <Card title="Фактический возврат и комиссии">
         <div className="mb-4">
           <RefundForm dealId={deal.id} currentRefund={deal.actualRefundAmount?.toString() ?? null} />
@@ -176,14 +164,6 @@ export default async function AdminDealPage({ params }: { params: Promise<{ id: 
           />
         </Card>
 
-        <Card title="Доступы ЛК ФНС">
-          <FnsSection
-            clientId={deal.clientId}
-            dealId={deal.id}
-            hasCredential={fnsStored}
-            configured={fnsConfigured}
-          />
-        </Card>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

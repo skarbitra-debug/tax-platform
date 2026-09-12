@@ -3,6 +3,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { z } from "zod";
 import { prisma } from "@tax/db";
+import { isForbiddenSeedIdentity } from "@/lib/session-policy";
 import { authConfig } from "@/auth.config";
 
 /** Zod-парс входа: email нормализуется в lowercase (контракт §1) */
@@ -36,6 +37,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const parsed = credentialsSchema.safeParse(credentials);
         if (!parsed.success) return null;
         const { email, password } = parsed.data;
+        if (isForbiddenSeedIdentity(email)) return null;
 
         // realtorProfile подгружается здесь один раз (при логине) —
         // realtorId уезжает в JWT и дальше фильтрует выборки ЛК (план §1)
