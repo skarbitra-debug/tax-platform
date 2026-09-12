@@ -1,67 +1,31 @@
-# E2E-тесты воронки (Playwright, план M1-8)
+# Локальная E2E-проверка остановки legacy приёма
 
-Сквозной сценарий: логин риэлтора → реф-ссылка → анкета клиента в инкогнито →
-заявка в ЛК риэлтора + негативы на мусорный токен. Один проект —
-chromium с эмуляцией Pixel 7 (анкету открывают из Telegram-WebView с телефона).
+`funnel.spec.ts` проверяет анонимные `/r/abcdefgh2345`, `/r/00-invalid` и `/register`: нейтральные сообщения об остановке, отсутствие форм и полей ПД. Старый happy path заменён новым контрактом; старый fixme про деактивацию ссылки не применим к безусловно закрытому экрану.
 
-**Важно:** тесты пишут в живую БД (создают Client/Deal) — гонять только на
-dev-базе или стейдже, НЕ на проде.
+Нужны Node 22+, pnpm и Chromium: `pnpm exec playwright install chromium`.
+Синтетическая локальная конфигурация runtime задаётся в окружении, без production `.env`. Установить зависимости и сгенерировать Prisma Client:
 
-## Предусловия
-
-- Node 22+, pnpm, Docker (для локального Postgres)
-- Зависимость `@playwright/test` в корне репо + браузер:
-  `npx playwright install chromium`
-
-## Запуск локально
-
-```bash
-# 1. Postgres из dev-compose
-docker compose up -d postgres
-
-# 2. Зависимости + миграции + seed С DEV-ДАННЫМИ (тестовый риэлтор
-#    realtor.dev@example.com / dev-realtor-123 — на нём живёт сценарий)
-pnpm install
-pnpm db:migrate
-SEED_DEV=1 pnpm db:seed        # PowerShell: $env:SEED_DEV="1"; pnpm db:seed
-
-# 3. Web-сервер (руками)
-pnpm dev:web
-
-# 4. В соседнем терминале — тесты
-E2E_BASE_URL=http://localhost:3000 npx playwright test
-# PowerShell: $env:E2E_BASE_URL="http://localhost:3000"; npx playwright test
+```sh
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm db:generate
 ```
 
-**Альтернатива — Playwright сам поднимет сервер** (как в CI): задать
-`E2E_WEBSERVER=1` — тогда шаг 3 не нужен, сервер стартует на порту из
-`E2E_BASE_URL` (Next читает `PORT`). Порт должен быть свободен, env web
-(`AUTH_SECRET`, `APP_URL`, `DATABASE_URL`…) — в окружении команды.
+Для этих страниц не нужны PostgreSQL server, миграции, seed, dev-вход и Telegram credentials. Если Prisma generate требует DATABASE_URL, задать синтетический loopback URL; он не должен указывать на production.
 
-`E2E_BASE_URL` можно не задавать — дефолт `http://localhost:3000`.
-Для прогона на стейдже: `E2E_BASE_URL=https://<стейдж-домен> npx playwright test`
-(миграции и `SEED_DEV=1`-seed должны быть применены там же).
+Запускать только web, в отдельном терминале:
 
-## В CI
+```sh
+unset E2E_WEBSERVER
+PORT=3319 pnpm --filter @tax/web dev --hostname 127.0.0.1
+```
 
-Джоб `db-tests` (`.github/workflows/ci.yml`) поднимает postgres-сервис,
-применяет миграции + `SEED_DEV=1`-seed, гоняет интеграционные тесты
-(`@tax/integration-tests`) и e2e (`E2E_WEBSERVER=1`, Playwright сам стартует web).
+Во втором терминале:
 
-Отчёт по падению: `npx playwright show-report` (трейсы и скриншоты
-собираются только для упавших тестов).
+```sh
+unset E2E_WEBSERVER
+E2E_BASE_URL=http://127.0.0.1:3319 pnpm e2e e2e/funnel.spec.ts
+```
 
-## Контракт data-testid (согласован с зонами вёрстки M1-3/M1-4/M1-6)
+Остановить web после проверки. `pnpm dev` запускает также bot и здесь не подходит. Значение `E2E_WEBSERVER=0` в исходном конфиге truthy: переменную нужно удалить, а не присваивать 0. Тест отказывается открывать не-loopback baseURL.
 
-| testid | Где | Что |
-|---|---|---|
-| `refLinkUrl` | `/cabinet` | элемент с **полным URL** реф-ссылки текстом |
-| `copyLinkBtn` | `/cabinet` | кнопка «Копировать» рядом со ссылкой |
-| `startQuizBtn` | `/r/[token]` | кнопка «Просчитать возврат» — открывает шаг анкеты |
-| `quizForm` | `/r/[token]` (шаг 2) | `<form>` анкеты; поля `name=` из `leadFormSchema`: `firstName`, `phone`, `salePriceRub`, `taxPaidRub`, чекбокс `consentPersonalData` — согласие ПДн 152-ФЗ (реальный кликабельный `<input type="checkbox">`) |
-| `quizSubmit` | `/r/[token]` | кнопка отправки анкеты |
-| `quizSuccess` | `/r/[token]` | блок «Заявка принята» после сабмита |
-| `dealRow` | `/cabinet/deals` | строка/карточка заявки; содержит имя клиента и label статуса («Новая заявка») |
-
-Страница невалидного/неизвестного/деактивированного токена: содержит слово
-«недействительна» (любая словоформа) и **не** рендерит `quizForm`.
+Текущий CI всё ещё содержит PostgreSQL/seed для отдельного integration suite и E2E на dev server. Изменение CI относится к B02a; для этого анонимного smoke seed не требуется. Browser smoke не доказывает отзыв старых сессий, закрытие legacy bot или защиту live. Прямые server actions/services проверяются `pnpm --filter @tax/web test`.
