@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import { authConfig } from "@/auth.config";
+import { isCurrentSessionGeneration, isForbiddenSeedIdentity } from "@/lib/session-policy";
 
 /**
  * 1-й слой защиты: JWT-guard в edge-runtime.
@@ -13,7 +14,8 @@ export default auth((req) => {
   const { nextUrl } = req;
   const path = nextUrl.pathname;
   const user = req.auth?.user;
-  const isLoggedIn = !!user;
+  const isLoggedIn = !!user && isCurrentSessionGeneration(user.sessionGeneration) &&
+    !isForbiddenSeedIdentity(user.email);
 
   const onCabinet = path.startsWith("/cabinet");
   const onAdmin = path.startsWith("/admin");

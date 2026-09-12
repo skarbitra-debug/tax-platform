@@ -16,18 +16,11 @@ export async function GET(request: Request): Promise<NextResponse> {
   const reason = url.searchParams.get("reason") === "blocked" ? "blocked" : "signout";
 
   const store = await cookies();
-  // Auth.js v5 Credentials+JWT: имя session-token различается http/https и
-  // может быть разбит на чанки (.0/.1). Гасим все известные варианты.
-  const names = [
-    "authjs.session-token",
-    "__Secure-authjs.session-token",
-    "authjs.session-token.0",
-    "__Secure-authjs.session-token.0",
-    "authjs.session-token.1",
-    "__Secure-authjs.session-token.1",
-  ];
-  for (const name of names) {
-    if (store.has(name)) store.delete(name);
+  // Exact cookie names only: any numeric chunk, no lookalike/CSRF cookies.
+  for (const { name } of store.getAll()) {
+    if (/^(?:__Secure-)?authjs\.session-token(?:\.\d+)?$/.test(name)) {
+      store.delete(name);
+    }
   }
 
   const redirectTo = new URL("/login", url);

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@tax/db";
 import { auth } from "@/auth";
+import { isCurrentSessionGeneration, isForbiddenSeedIdentity } from "./session-policy";
 
 type AppRole = "ADMIN" | "REALTOR";
 
@@ -19,15 +20,27 @@ export async function requireRole(role: AppRole) {
     redirect("/login");
   }
 
+  if (!isCurrentSessionGeneration(session.user.sessionGeneration)) {
+    redirect("/api/session/end?reason=blocked");
+  }
+
   const dbUser = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { role: true, status: true },
+    select: { role: true, status: true, email: true, realtorProfile: { select: { id: true } } },
   });
 
   // Удалён или не ACTIVE (BLOCKED/PENDING) → гасим JWT и уводим на /login.
   // НЕ redirect("/login") напрямую: живой токен → middleware вернул бы «домой»
   // → сюда → бесконечный цикл. Route-хендлер вне matcher чистит куку.
-  if (!dbUser || dbUser.status !== "ACTIVE") {
+  if (!dbUser || dbUser.status !== "ACTIVE" || isForbiddenSeedIdentity(dbUser.email)) {
+    redirect("/api/session/end?reason=blocked");
+  }
+
+  const realtorId = dbUser.realtorProfile?.id ?? null;
+  if (
+    dbUser.role !== session.user.role || realtorId !== session.user.realtorId ||
+    (dbUser.role === "REALTOR" && !realtorId)
+  ) {
     redirect("/api/session/end?reason=blocked");
   }
 
@@ -36,5 +49,5 @@ export async function requireRole(role: AppRole) {
     redirect(dbUser.role === "ADMIN" ? "/admin" : "/cabinet");
   }
 
-  return session;
+  return { ...session, user: { ...session.user, role: dbUser.role, realtorId } };
 }
