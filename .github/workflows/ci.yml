@@ -103,10 +103,22 @@ jobs:
         run: pnpm db:deploy && pnpm db:seed
       - name: Integration tests (@tax/core против БД)
         run: pnpm --filter @tax/integration-tests test
+      - name: Create isolated auth E2E database (no seed)
+        run: psql -h localhost -U tax -d postgres -c 'CREATE DATABASE tax_b02a4_auth_e2e'
+        env:
+          PGPASSWORD: tax
+      - name: Apply existing migrations to auth E2E database
+        run: pnpm db:deploy
+        env:
+          DATABASE_URL: postgresql://tax:tax@localhost:5432/tax_b02a4_auth_e2e
       - name: Install Playwright chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: E2E воронки (Playwright поднимает web сам)
         run: pnpm e2e
+        env:
+          DATABASE_URL: postgresql://tax:tax@localhost:5432/tax_b02a4_auth_e2e
+          E2E_SYNTHETIC_DB: "1"
+          SEED_DEV: "0"
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4

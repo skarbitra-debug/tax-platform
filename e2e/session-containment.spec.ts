@@ -24,6 +24,7 @@ test("legacy session API rejects a genuinely encrypted baseline JWT", async ({ c
   const response = await context.request.get(`${baseURL}/api/auth/session`);
   expect(response.ok()).toBe(true);
   expect((await response.json())?.user).toBeFalsy();
+  expect((await context.cookies()).filter(c => c.name === cookieName)).toEqual([]);
 });
 
 test("legacy cookie reaches login from admin without redirect loops", async ({ context, page, baseURL }) => {
@@ -67,4 +68,51 @@ test("expired current generation is anonymous and cannot enter admin", async ({ 
   await putToken(context, baseURL!, { sessionGeneration: 1 }, -60);
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
+});
+
+for (const generation of [0, 2, "1", 1.5]) {
+  test(`invalid generation ${JSON.stringify(generation)} is anonymous and cleared`, async ({ context, page, baseURL }) => {
+    await putToken(context, baseURL!, { sessionGeneration: generation });
+    const response = await context.request.get(`${baseURL}/api/auth/session`);
+    expect(response.ok()).toBe(true);
+    expect((await response.json())?.user).toBeFalsy();
+    expect((await context.cookies()).filter(c => c.name === cookieName)).toEqual([]);
+    await page.goto("/admin");
+    await expect(page).toHaveURL(/\/login(?:\?|$)/);
+    await page.goto("/login");
+    await expect(page).toHaveURL(/\/login(?:\?|$)/);
+  });
+}
+
+for (const claims of [{}, { sessionGeneration: 0 }]) {
+  test(`HTTP update cannot upgrade ${"sessionGeneration" in claims ? "stale" : "legacy"} token`, async ({ context, baseURL }) => {
+    // Get CSRF before installing the revoked token: test POST itself performs rejection.
+    const csrf = await context.request.get(`${baseURL}/api/auth/csrf`);
+    const { csrfToken } = await csrf.json();
+    await putToken(context, baseURL!, claims);
+    const response = await context.request.post(`${baseURL}/api/auth/session`, {
+      data: { csrfToken, data: { sessionGeneration: 1, user: { id: "synthetic-user", role: "ADMIN", sessionGeneration: 1 } } },
+    });
+    expect(response.ok()).toBe(true);
+    expect((await response.json())?.user).toBeFalsy();
+    expect((await context.cookies()).filter(c => c.name === cookieName)).toEqual([]);
+  });
+}
+
+test("session cleanup expires every exact plain/secure numeric chunk and preserves lookalikes", async ({ context, baseURL }) => {
+  const removed = ["authjs.session-token", "__Secure-authjs.session-token"].flatMap(prefix => [prefix, `${prefix}.0`, `${prefix}.2`, `${prefix}.10`]);
+  const preserved = ["authjs.session-token-backup", "authjs.session-token.x", "__Secure-authjs.session-token.x", "authjs.csrf-token", "__Host-authjs.csrf-token"];
+  // Raw HTTP header exercises Secure prefixes even on browsers that reject Secure loopback storage.
+  const response = await context.request.get(`${baseURL}/api/session/end?reason=blocked&callbackUrl=https://example.test`, {
+    headers: { Cookie: [...removed, ...preserved].map(name => `${name}=synthetic`).join("; ") }, maxRedirects: 0,
+  });
+  expect(response.status()).toBe(303);
+  expect(response.headers().location).toBe(`${baseURL}/login?error=blocked`);
+  const cookies = response.headersArray().filter(h => h.name.toLowerCase() === "set-cookie").map(h => h.value);
+  for (const name of removed) {
+    const cookie = cookies.find(value => value.startsWith(`${name}=`));
+    expect(cookie, `expiry for ${name}`).toBeDefined();
+    expect(cookie).toMatch(/(?:Max-Age=0|Expires=Thu, 01 Jan 1970)/i);
+  }
+  for (const name of preserved) expect(cookies.some(value => value.startsWith(`${name}=`))).toBe(false);
 });
